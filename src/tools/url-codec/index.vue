@@ -3,14 +3,28 @@
  * URL 编解码（PRD 4.3.3）
  * 解码 / Component 编码 / URI 编码；完整 URL 额外给出结构化解析
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { decodeUrl, encodeUrl, parseUrl } from '../../utils/convert/urlCodec.js'
 import { copyText } from '../../utils/clipboard.js'
+import { recordHistory } from '../../utils/db.js'
+import { useReplay } from '../../utils/replay.js'
 
 const input = ref('')
 const inputEl = ref(null)
 const mode = ref('decode') // decode | component | uri
+
+useReplay('url-codec', (v) => (input.value = String(v ?? '')))
+
+let histTimer = null
+watch(input, (v) => {
+  clearTimeout(histTimer)
+  histTimer = setTimeout(() => {
+    if (!v) return
+    const r = mode.value === 'decode' ? decodeUrl(v) : encodeUrl(v, mode.value)
+    if (r.ok) recordHistory('url-codec', v, r.data)
+  }, 1000)
+})
 
 const modes = [
   { id: 'decode', label: '解码' },

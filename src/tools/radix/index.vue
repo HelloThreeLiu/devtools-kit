@@ -3,14 +3,27 @@
  * 进制转换（PRD 4.3.5）
  * 2/8/10/16 进制互转；0b/0o/0x 前缀自动识别；BigInt 大数安全；36 进制只读输出
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertRadix } from '../../utils/convert/radix.js'
 import { copyText } from '../../utils/clipboard.js'
+import { recordHistory } from '../../utils/db.js'
+import { useReplay } from '../../utils/replay.js'
 
 const input = ref('')
 const inputEl = ref(null)
 const base = ref('auto') // 'auto' | 2 | 8 | 10 | 16
+
+useReplay('radix', (v) => setInput(String(v ?? '')))
+
+let histTimer = null
+watch(input, (v) => {
+  clearTimeout(histTimer)
+  histTimer = setTimeout(() => {
+    const r = convertRadix(v, base.value === 'auto' ? 10 : base.value)
+    if (r.ok) recordHistory('radix', v, r.outputs.dec)
+  }, 1000)
+})
 
 const bases = [
   { id: 'auto', label: '自动' },

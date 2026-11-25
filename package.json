@@ -6,6 +6,7 @@
     "check": "node scripts/validate-plugin.mjs && npm run build && node scripts/check-dist.mjs"
   },
   "dependencies": {
+    "qrcode": "^1.5.4",
     "vue": "^3.5.43"
   },
   "devDependencies": {

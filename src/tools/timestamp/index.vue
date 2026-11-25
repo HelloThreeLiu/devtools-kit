@@ -3,7 +3,7 @@
  * 时间戳转换（PRD 4.3.1 v0.3 / 技术设计 §11.1）
  * 单输入框方向自动识别；转换逻辑全部在 utils/convert/timestamp.js 纯函数中
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import {
   analyze,
@@ -14,11 +14,26 @@ import {
   zoneLabel,
 } from '../../utils/convert/timestamp.js'
 import { copyText } from '../../utils/clipboard.js'
+import { recordHistory } from '../../utils/db.js'
+import { useReplay } from '../../utils/replay.js'
 
 const input = ref('')
 const inputEl = ref(null)
 const nowTick = ref(Date.now())
 const zone = zoneLabel()
+
+/* 历史回填：点击历史记录后回到本工具并恢复输入 */
+useReplay('timestamp', (v) => setInput(String(v ?? '')))
+
+/* 历史记录：有效结果停顿 1s 后写入（PRD 4.7.1） */
+let histTimer = null
+watch(input, (v) => {
+  clearTimeout(histTimer)
+  histTimer = setTimeout(() => {
+    const r = analyze(v)
+    if (r.kind === 'ts' || r.kind === 'date') recordHistory('timestamp', v, fmtLocal(new Date(r.ms)))
+  }, 1000)
+})
 
 const res = computed(() => analyze(input.value))
 const isValue = computed(() => res.value.kind === 'ts' || res.value.kind === 'date')
@@ -90,7 +105,10 @@ onMounted(() => {
   inputEl.value?.focus()
   inputEl.value?.select()
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  clearTimeout(histTimer)
+})
 </script>
 
 <template>

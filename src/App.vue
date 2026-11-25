@@ -7,11 +7,13 @@ import { onMounted } from 'vue'
 import { utools } from './utils/utools.js'
 import { route, currentTool, handlePluginEnter, handlePluginOut } from './router.js'
 import { useTheme } from './utils/theme.js'
+import { initHistory } from './utils/db.js'
 import HomeView from './views/HomeView.vue'
 import ToolShell from './components/ToolShell.vue'
 import ToastHost from './components/ToastHost.vue'
 
 useTheme() // 主题初始化：读取设置 + prefers-color-scheme 监听
+initHistory() // 历史记录加载（本地数据目录，经 preload）
 
 onMounted(() => {
   if (typeof utools.onPluginReady === 'function') {

@@ -1144,6 +1144,99 @@ a { color: inherit; text-decoration: none; }
 .textarea[aria-invalid="true"] { border-color: var(--danger-fill); }
 .textarea[aria-invalid="true"]:focus { box-shadow: var(--danger-ring); }
 
+/* ======================= 历史记录面板（ToolShell） ======================= */
+
+.menu--hist { width: 340px; padding: 0; }
+
+.hist-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-10) var(--sp-12) var(--sp-8);
+  font-size: var(--fs-12);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--border);
+}
+
+.hist-list { max-height: 280px; overflow-y: auto; }
+
+.hist-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.hist-row:last-child { border-bottom: 0; }
+
+.hist-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12);
+  text-align: left;
+  border-radius: 0;
+}
+.hist-main:hover { background: var(--surface-2); }
+
+.hist-out {
+  font-family: var(--mono);
+  font-size: var(--fs-12);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hist-in {
+  font-size: var(--fs-12);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hist-ago {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.hist-del { width: var(--h-control-sm); align-self: center; margin-right: var(--sp-6); }
+
+.hist-empty {
+  padding: var(--sp-20) var(--sp-14);
+  font-size: var(--fs-12);
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.8;
+}
+
+.hist-clear {
+  width: 100%;
+  height: var(--h-statusbar);
+  border-top: 1px solid var(--border);
+  color: var(--danger);
+  font-size: var(--fs-12);
+  letter-spacing: 0.02em;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.hist-clear:hover { background: var(--danger-weak); }
+
+/* 主界面 · 最近使用 */
+.recent-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  height: var(--h-statusbar);
+  margin-bottom: var(--sp-4);
+}
+
+.recent-clear.recent-clear--confirm { color: var(--danger); }
+.recent-clear.recent-clear--confirm:hover { background: var(--danger-weak); color: var(--danger); }
+
 /* ======================= 动效降级 ======================= */
 
 @media (prefers-reduced-motion: reduce) {

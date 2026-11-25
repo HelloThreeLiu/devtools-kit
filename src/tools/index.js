@@ -10,6 +10,12 @@ import JsonTool from './json/index.vue'
 import RadixTool from './radix/index.vue'
 import UuidTool from './uuid/index.vue'
 import DateCalcTool from './date-calc/index.vue'
+import HashTool from './hash/index.vue'
+import UnicodeTool from './unicode/index.vue'
+import CaseConvertTool from './case-convert/index.vue'
+import TextStatTool from './text-stat/index.vue'
+import QrcodeTool from './qrcode/index.vue'
+import ColorTool from './color/index.vue'
 
 /** 主入口 feature.code（指向主界面） */
 export const MAIN_CODE = 'devtools-kit'
@@ -106,7 +112,7 @@ export const tools = [
     priority: 'P1',
     cmds: ['哈希', 'hash', 'md5', 'sha'],
     keywords: 'md5 sha 摘要 digest',
-    component: null, // P1
+    component: HashTool,
   },
   {
     id: 'unicode',
@@ -118,7 +124,7 @@ export const tools = [
     priority: 'P1',
     cmds: ['unicode', 'unicode转中文'],
     keywords: '转义 实体 u4f60',
-    component: null, // P1
+    component: UnicodeTool,
   },
   {
     id: 'date-calc',
@@ -154,7 +160,7 @@ export const tools = [
     priority: 'P1',
     cmds: ['命名转换', '驼峰转换'],
     keywords: 'camel snake kebab 大小写 constant',
-    component: null, // P1
+    component: CaseConvertTool,
   },
   {
     id: 'text-stat',
@@ -166,7 +172,7 @@ export const tools = [
     priority: 'P1',
     cmds: ['文本统计', '字数统计'],
     keywords: 'count 字数 行数 utf8',
-    component: null, // P1
+    component: TextStatTool,
   },
   {
     id: 'qrcode',
@@ -178,7 +184,7 @@ export const tools = [
     priority: 'P1',
     cmds: ['二维码', 'qrcode'],
     keywords: '扫码 扫码识别',
-    component: null, // P1
+    component: QrcodeTool,
   },
   {
     id: 'color',
@@ -190,7 +196,7 @@ export const tools = [
     priority: 'P1',
     cmds: ['颜色转换', 'color', '取色'],
     keywords: 'hex rgb hsl 取色 设计',
-    component: null, // P1
+    component: ColorTool,
   },
 ]
 

@@ -7,12 +7,28 @@ import { computed, ref } from 'vue'
 import Icon from '../components/Icon.vue'
 import ThemeMenu from '../components/ThemeMenu.vue'
 import { tools, CATEGORIES } from '../tools/index.js'
-import { favorites, toggleFavorite } from '../utils/db.js'
+import { favorites, toggleFavorite, getRecentTools, clearAllHistory } from '../utils/db.js'
 import { navigate, subInputText } from '../router.js'
 import { inUtoolsEnv } from '../utils/utools.js'
 import { toast } from '../utils/toast.js'
 
 const activeTab = ref('all')
+const confirmClear = ref(false)
+let confirmTimer = null
+
+/** 清空全部历史：两段式确认（3s 内再点一次生效） */
+function onClearAll() {
+  if (!confirmClear.value) {
+    confirmClear.value = true
+    clearTimeout(confirmTimer)
+    confirmTimer = setTimeout(() => (confirmClear.value = false), 3000)
+    return
+  }
+  clearTimeout(confirmTimer)
+  confirmClear.value = false
+  clearAllHistory()
+  toast('已清空全部历史记录')
+}
 
 const norm = (s) => String(s).toLowerCase()
 const matches = (t, kw) =>
@@ -28,6 +44,15 @@ const favTools = computed(() =>
   favorites.value
     .map((id) => tools.find((t) => t.id === id))
     .filter((t) => t && (activeTab.value === 'all' || t.category === activeTab.value) && matches(t, subInputText.value)),
+)
+
+/** 最近使用：从历史记录推导（PRD 4.7.1），随 activeTab 与过滤词联动 */
+const recentTools = computed(() =>
+  getRecentTools(10)
+    .map(({ id, ts }) => ({ t: tools.find((x) => x.id === id), ts }))
+    .filter(
+      (x) => x.t && (activeTab.value === 'all' || x.t.category === activeTab.value) && matches(x.t, subInputText.value),
+    ),
 )
 
 const nothing = computed(() => visibleTools.value.length === 0)
@@ -125,7 +150,33 @@ function onSearchEnter() {
       </div>
     </section>
 
-    <section class="section" :class="{ 'section--all': !favTools.length }" aria-labelledby="h-all" @keydown="onListKeydown">
+    <section v-if="recentTools.length" class="section" aria-labelledby="h-recent">
+      <h2 id="h-recent">最近使用</h2>
+      <div class="section-body">
+        <div class="recent-bar">
+          <span class="tag">{{ recentTools.length }}</span>
+          <span class="grow"></span>
+          <button
+            type="button"
+            class="btn btn--ghost recent-clear"
+            :class="{ 'recent-clear--confirm': confirmClear }"
+            @click="onClearAll"
+          >
+            {{ confirmClear ? '再点一次确认清空' : '清空全部历史' }}
+          </button>
+        </div>
+        <ul class="quick">
+          <li v-for="x in recentTools" :key="x.t.id" class="row">
+            <button type="button" class="row-main" @click="openTool(x.t)">
+              <Icon :name="x.t.icon" />
+              <span class="name">{{ x.t.name }}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" :class="{ 'section--all': !favTools.length && !recentTools.length }" aria-labelledby="h-all" @keydown="onListKeydown">
       <h2 id="h-all">全部工具</h2>
       <div class="section-body">
         <ul class="tools">

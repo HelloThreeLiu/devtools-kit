@@ -45,6 +45,36 @@
       "code": "date-calc",
       "description": "日期换算：农历、星期、年内序数、日期差",
       "cmds": ["日期换算", "农历", "日期计算", "datecalc"]
+    },
+    {
+      "code": "hash",
+      "description": "MD5 / SHA-1 / SHA-256 / SHA-512 哈希计算",
+      "cmds": ["哈希", "hash", "md5", "sha"]
+    },
+    {
+      "code": "unicode",
+      "description": "Unicode 转义序列与中文互转",
+      "cmds": ["unicode", "unicode转中文"]
+    },
+    {
+      "code": "case-convert",
+      "description": "命名风格转换：camel / snake / kebab 等五种",
+      "cmds": ["命名转换", "驼峰转换"]
+    },
+    {
+      "code": "text-stat",
+      "description": "文本统计：字符数、单词数、行数、字节数",
+      "cmds": ["文本统计", "字数统计"]
+    },
+    {
+      "code": "qrcode",
+      "description": "文本转二维码，本地生成可复制",
+      "cmds": ["二维码", "qrcode"]
+    },
+    {
+      "code": "color",
+      "description": "颜色格式转换：HEX / RGB / HSL 互转",
+      "cmds": ["颜色转换", "color", "取色"]
     }
   ]
 }

@@ -14,6 +14,8 @@ import {
   rootSummary,
 } from '../../utils/convert/jsonFormat.js'
 import { copyText } from '../../utils/clipboard.js'
+import { recordHistory } from '../../utils/db.js'
+import { useReplay } from '../../utils/replay.js'
 
 const SAMPLE =
   '{"name":"devtools-kit","version":"1.0.0","description":"uTools 开发工具箱","tools":[{"id":"timestamp","p0":true},{"id":"base64","p0":true},{"id":"json","p0":true}],"meta":{"author":"HelloThreeLiu","stars":42,"active":true,"repo":null}}'
@@ -25,6 +27,8 @@ const input = ref('')
 const inputEl = ref(null)
 const format = ref('2') // '2' | '4' | 'tab' | 'min'
 const collapsed = ref(new Set())
+
+useReplay('json', (v) => (input.value = String(v ?? '')))
 
 const formats = [
   { id: '2', label: '2 空格' },
@@ -139,6 +143,16 @@ const excerpt = computed(() => {
 /* 输入变化时重置折叠 */
 watch(effectiveInput, () => {
   collapsed.value = new Set()
+})
+
+/* 历史记录：合法 JSON 停顿 1s 后写入（PRD 4.7.1） */
+let histTimer = null
+watch(effectiveInput, (v) => {
+  clearTimeout(histTimer)
+  histTimer = setTimeout(() => {
+    const r = formatJson(v, format.value)
+    if (r.ok) recordHistory('json', v, r.data)
+  }, 1000)
 })
 
 onMounted(() => {

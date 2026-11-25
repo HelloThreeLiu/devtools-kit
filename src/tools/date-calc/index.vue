@@ -3,7 +3,7 @@
  * 日期换算（PRD 4.4.1）
  * 星期 / 农历（Intl 中文历法）/ 年内序数 / ISO 周 / 距今天数 + 日期差计算器
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import {
   LUNAR_MAX_YEAR,
@@ -17,11 +17,29 @@ import {
   parseDateYMD,
 } from '../../utils/convert/dateCalc.js'
 import { copyText } from '../../utils/clipboard.js'
+import { recordHistory } from '../../utils/db.js'
+import { useReplay } from '../../utils/replay.js'
 
 const input = ref('')
 const inputEl = ref(null)
 const d1 = ref('')
 const d2 = ref('')
+
+useReplay('date-calc', (v) => (input.value = String(v ?? '')))
+
+let histTimer = null
+watch(input, (v) => {
+  clearTimeout(histTimer)
+  histTimer = setTimeout(() => {
+    const d = parseDateYMD(v)
+    if (!d || d.getFullYear() < LUNAR_MIN_YEAR || d.getFullYear() > LUNAR_MAX_YEAR) return
+    try {
+      recordHistory('date-calc', v, lunar(d).text)
+    } catch (e) {
+      /* 农历不可用不记录 */
+    }
+  }, 1000)
+})
 
 const date = computed(() => parseDateYMD(input.value))
 const inRange = computed(() => {
