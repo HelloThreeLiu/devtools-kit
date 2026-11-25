@@ -1,0 +1,190 @@
+/* ============================================================
+   DevTools Kit · UI 设计令牌（唯一来源 Single Source of Truth）
+   规范文档：docs/设计令牌.md（新增/修改令牌必须先在该文档登记）
+   生效范围：M2 起 src/main.css 的基础层，全部组件样式仅允许引用本文件令牌
+
+   分层说明：
+   · 语义层（颜色/主题）：随 html[data-theme] 切换，组件不感知主题
+   · 组件层（字号/间距/圆角/动效/尺寸/层级）：主题无关，恒定
+   · 原始色值仅登记于 docs/设计令牌.md 的色板参考表，不进入代码
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* ── 语义颜色 · 亮色主题 ─────────────────────────────── */
+
+  /* 画布与应用背景 */
+  --bg: #ffffff;
+  /* 卡片、面板、浮层表面 */
+  --surface: #ffffff;
+  /* 悬停 / 按压 / 次级表面 */
+  --surface-2: #f3f5f7;
+  /* 只读代码与结果区背景 */
+  --code-bg: #f6f8fa;
+  /* 主文本（白底 15.8:1） */
+  --fg: #1f2328;
+  /* 次要文本、标签、图标默认（白底 5.8:1，surface-2 上 5.3:1） */
+  --muted: #5d6772;
+  /* 分隔线、面板描边 */
+  --border: #e2e5e9;
+  /* 强分隔：滚动条、描边按钮、kbd */
+  --border-strong: #c9d0d8;
+  /* 输入类控件边框（白底 3.2:1，WCAG 1.4.11 非文本对比度） */
+  --border-control: #88919b;
+  /* 品牌蓝：仅限焦点环、选中指示条、弱底生成；对白底 3.76:1，禁止作小字号文字色 */
+  --accent: #1e80ff;
+  /* 品牌色文字形态（白底 5.9:1，accent-weak 上 5.2:1） */
+  --accent-text: #0b5fd0;
+  /* 品牌色实心填充上的文字 */
+  --on-accent: #ffffff;
+  /* 品牌色弱底：键盘选中行背景、按压反馈 */
+  --accent-weak: #e8f1ff;
+  /* 错误文字（白底 6.3:1，danger-weak 上 5.6:1） */
+  --danger: #ba2126;
+  /* 错误实心填充、错误态控件边框 */
+  --danger-fill: #e5484d;
+  /* 错误弱底（行内错误摘录底色） */
+  --danger-weak: #fdefee;
+  /* 成功文字（白底 5.4:1） */
+  --success: #0a7a3d;
+  /* 成功弱底 */
+  --success-weak: #e9f5ed;
+  /* 浮层阴影（菜单 / 下拉面板） */
+  --shadow-pop: 0 8px 24px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+
+  /* ── 焦点与校验环 ─────────────────────────────────────── */
+  --focus-ring: 0 0 0 1px var(--accent-text), 0 0 0 4px rgba(11, 95, 208, 0.12);
+  --danger-ring: 0 0 0 1px var(--danger-fill), 0 0 0 4px rgba(229, 72, 77, 0.14);
+
+  /* ── JSON 语法高亮（仅限 --code-bg 之上使用）──────────── */
+  --tk-key: #0550ae;
+  --tk-str: #116329;
+  --tk-num: #6639ba;
+  --tk-bool: #953800;
+  --tk-pun: #57606a;
+
+  /* ── 字体（系统字体栈，禁止加载网络字体）───────────────── */
+  --ui: "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Code", Consolas, "SF Mono", Menlo, "Courier New", monospace;
+
+  /* ── 字号（全站 5 档，禁止出现其他字号）────────────────── */
+  --fs-12: 12px;   /* 辅助：区块标签、状态栏、行号、键名 */
+  --fs-13: 13px;   /* 正文次级：按钮、输入、错误文案、菜单项 */
+  --fs-14: 14px;   /* 正文默认（body）、工具行名称 */
+  --fs-16: 16px;   /* 工具页标题、空态标题 */
+  --fs-20: 20px;   /* 主结果 hero 数字 */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* ── 行高 ─────────────────────────────────────────────── */
+  --lh-tight: 1.3;   /* hero 大数字、标题 */
+  --lh-normal: 1.5;  /* 默认正文 */
+  --lh-mono: 1.65;   /* 代码与多行等宽文本 */
+  /* 单行控件（按钮/输入/行）line-height 用 1，随控件高度居中 */
+
+  /* ── 间距（唯一刻度，令牌名即像素值）────────────────────── */
+  --sp-2: 2px;
+  --sp-4: 4px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-14: 14px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+
+  /* ── 圆角 ─────────────────────────────────────────────── */
+  --radius-sm: 4px;   /* kbd、tag、行内小按钮、折叠开关 */
+  --radius: 6px;      /* 默认：按钮、输入框、工具行 */
+  --radius-lg: 8px;   /* 面板、浮层、textarea、toast */
+
+  /* ── 动效 ─────────────────────────────────────────────── */
+  --dur-fast: 80ms;   /* hover / press / 颜色过渡 */
+  --dur: 150ms;       /* 浮层、toast 进出 */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ── 布局与控件尺寸（M2 起强制引用；原型已按等值核对）───── */
+  --canvas-w: 800px;          /* 设计画布宽（uTools 插件区域） */
+  --canvas-h: 544px;          /* 设计画布高（pluginSetting.height，不含主输入框） */
+  --gutter: 24px;             /* 页面左右留白 */
+  --h-topbar: 48px;           /* 工具页顶栏 */
+  --h-tabs: 46px;             /* 主界面页签栏 */
+  --h-statusbar: 34px;        /* 底部状态栏 */
+  --h-statusbar-live: 42px;   /* 底部实时条（当前时间戳） */
+  --h-control: 30px;          /* 标准控件：按钮、图标按钮、返回 */
+  --h-control-sm: 26px;       /* 小控件：分段选项、面板内图标按钮 */
+  --h-control-xs: 24px;       /* 微控件：行内操作、输入清除 */
+  --h-input: 42px;            /* 单行输入框 */
+  --h-row: 38px;              /* 主界面工具行 */
+  --h-row-sm: 34px;           /* 快捷行、菜单项 */
+  --h-tag: 20px;
+  --h-kbd: 20px;
+  --h-toast: 34px;
+  --section-label-w: 72px;    /* 主界面分区标签列宽 */
+  --kv-label-w: 88px;         /* 结果面板「键」列宽 */
+
+  /* ── 层级 ─────────────────────────────────────────────── */
+  --z-lineno: 1;      /* JSON 行号 sticky 列 */
+  --z-menu: 30;       /* 下拉菜单 */
+  --z-toast: 90;      /* 全局轻提示 */
+}
+
+/* ── 语义颜色 · 暗色主题 ─────────────────────────────────── */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #1e2126;
+  --surface: #1e2126;
+  --surface-2: #272b32;
+  --code-bg: #16181c;
+  --fg: #e6e6e6;            /* bg 上 12.9:1 */
+  --muted: #9aa0a6;         /* bg 上 6.1:1 */
+  --border: #343a40;
+  --border-strong: #4a515b;
+  --border-control: #6b7482;
+  --accent: #4c9aff;
+  --accent-text: #4c9aff;   /* bg 上 5.7:1，暗色下品牌色可直接作文字 */
+  --on-accent: #0d1420;
+  --accent-weak: #1b2a42;
+  --focus-ring: 0 0 0 1px var(--accent), 0 0 0 4px rgba(76, 154, 255, 0.22);
+  --danger: #ff6666;
+  --danger-fill: #ff6666;
+  --danger-weak: #3a2124;
+  --danger-ring: 0 0 0 1px var(--danger-fill), 0 0 0 4px rgba(255, 102, 102, 0.22);
+  --success: #4cc38a;
+  --success-weak: #16301f;
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  --tk-key: #79b8ff;
+  --tk-str: #7ee787;
+  --tk-num: #d2a8ff;
+  --tk-bool: #ffa657;
+  --tk-pun: #8b949e;
+}
+
+/* ── 全局行为基线（与令牌强绑定，随 tokens 一起生效）──────── */
+
+/* 键盘焦点可见性：全局兜底；控件可按需覆盖但不得移除 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 文本选区 */
+::selection { background: var(--accent-weak); }
+
+/* 动效降级：遵循系统「减少动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

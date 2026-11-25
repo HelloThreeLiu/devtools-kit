@@ -16,6 +16,7 @@
 | v0.1 | 2026-11-25 | GLM（AI 协作） | 初稿，基于需求澄清会议产出 |
 | v0.2 | 2026-11-25 | GLM（AI 协作） | 依据 uTools 官方文档校准：历史记录改存插件本地数据目录、SubInput API 更正为 setSubInput(onChange)、主题检测改用 prefers-color-scheme、返回导航不拦截 Esc |
 | v0.3 | 2026-11-25 | GLM（AI 协作） | 原型评审定稿：时间戳改数量级阈值识别（解决「输入 0」自相矛盾，不限位数）、方向自动识别定稿、历史记录入口定义、544 画布语义澄清；setExpandHeight 拼写经 utools-api-types 8.x 核实维持不变 |
+| v0.4 | 2026-11-25 | GLM（AI 协作） | 建立设计令牌体系：原型视觉值全量提取为 docs/design/tokens.css + docs/设计令牌.md，§7 增加令牌约束条款（后续 UI 改动一律遵循） |
 
 ---
 
@@ -539,6 +540,7 @@ docs/
 - **字体**：输入/输出区使用等宽字体（如 `JetBrains Mono, Consolas, monospace`）保证对齐；
 - **主题**：CSS 变量定义 `--bg`/`--fg`/`--accent` 等 token，暗色模式仅切换变量值；
 - **可访问性**：按钮均有文字或 icon+tooltip；错误信息与输入框关联（`aria-describedby`）；
+- **设计令牌约束（v0.4 新增）**：所有页面的 UI 实现与后续改动必须遵循 [`docs/设计令牌.md`](./设计令牌.md)（唯一令牌来源 [`docs/design/tokens.css`](./design/tokens.css)），组件样式禁止硬编码颜色/字号/间距/层级等视觉值；
 - **反馈**：所有成功操作（复制/收藏/清空）均有 ≤ 1.5s 的轻提示，不打断操作。
 
 ---
