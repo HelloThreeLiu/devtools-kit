@@ -58,8 +58,6 @@ async function run() {
   })
   hashes.value = next
   loading.value = false
-  const md5v = next.md5
-  if (md5v && md5v !== '不可用') recordHistory('hash', text, `md5: ${md5v}`)
 }
 
 watch(input, () => run())

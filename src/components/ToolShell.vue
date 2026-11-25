@@ -86,7 +86,7 @@ function onClear() {
       >
         <Icon name="clock" />
       </button>
-      <div v-show="histOpen" class="menu menu--hist" role="menu" aria-label="历史记录">
+      <div v-show="histOpen" class="menu--hist" role="menu" aria-label="历史记录">
         <div class="hist-head">
           <span>历史记录</span>
           <span class="tag">{{ records.length }}</span>

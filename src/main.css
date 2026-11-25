@@ -1145,8 +1145,21 @@ a { color: inherit; text-decoration: none; }
 .textarea[aria-invalid="true"]:focus { box-shadow: var(--danger-ring); }
 
 /* ======================= 历史记录面板（ToolShell） ======================= */
+/* 独立类名，不复用 .menu——避免 `.menu button` 规则误命中面板内的行按钮 */
 
-.menu--hist { width: 340px; padding: 0; }
+.menu--hist {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--sp-4));
+  z-index: var(--z-menu);
+  width: 340px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  transform-origin: top right;
+}
 
 .hist-head {
   display: flex;
