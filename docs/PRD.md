@@ -14,6 +14,7 @@
 | 版本 | 日期 | 修订人 | 说明 |
 | --- | --- | --- | --- |
 | v0.1 | 2026-11-25 | GLM（AI 协作） | 初稿，基于需求澄清会议产出 |
+| v0.2 | 2026-11-25 | GLM（AI 协作） | 依据 uTools 官方文档校准：历史记录改存插件本地数据目录、SubInput API 更正为 setSubInput(onChange)、主题检测改用 prefers-color-scheme、返回导航不拦截 Esc |
 
 ---
 
@@ -150,7 +151,7 @@ DevTools Kit
 4. **输入容错**：非法输入时给出明确的行内错误提示（红字 + 原因），不得白屏或卡死；
 5. **空态引导**：无输入时展示一句用法示例，如「输入时间戳或日期，如 1735689600 / 2025-01-01 08:00:00」；
 6. **即时清除**：提供「清空」操作，一键回到空态；
-7. **键盘可退出**：`Esc` 返回工具列表（主界面）。
+7. **返回导航**：工具页头部提供「← 返回」按钮回到工具列表（主界面）；不拦截 `Esc` 等由 uTools 全局处理的快捷键，避免与宿主行为冲突。
 
 ### 4.3 编解码与加密类
 
@@ -360,9 +361,11 @@ DevTools Kit
 - 每个工具自动记录最近 50 条输入（含对应输出摘要与时间），输入与上次相同则不重复记录；
 - 主界面展示「最近使用」工具（按最后使用时间倒序，最多 10 个）；
 - 支持单条删除与一键清空全部历史；
-- 历史仅存本地 `utools.db`，不上传。
+- 历史仅存本地（uTools 插件应用本地数据目录，不参与 uTools 云同步），不上传。
 
-**验收标准**：使用 3 个不同工具后主界面「最近使用」按正确顺序展示；清空后 db 中对应记录删除。
+> 依据官方《数据存储》规范，「操作记录」类数据不放入同步数据库，应存储在插件应用本地数据目录（`utools.getPluginLocalDataPath()`）。
+
+**验收标准**：使用 3 个不同工具后主界面「最近使用」按正确顺序展示；清空后本地历史文件中对应记录删除。
 
 #### 4.7.2 工具收藏/置顶（P1）
 
@@ -424,7 +427,7 @@ DevTools Kit
 
 #### 4.8.3 主界面与搜索框联动
 
-进入主界面后使用 `utools.setSubInput()` 将 uTools 搜索框接管为「工具过滤框」：用户输入即过滤主界面工具列表，选中即进入工具（`utools.setSubInputValue` + `onSubInput` 事件配合）。
+进入主界面后使用 `utools.setSubInput(onChange, placeholder)` 将 uTools 搜索框主输入框接管为「工具过滤框」：`onChange` 回调实时接收输入内容用于过滤主界面工具列表，回车进入首个匹配工具后调用 `utools.removeSubInput()` 释放输入框；离开主界面恢复搜索框默认行为。需要回填内容时使用 `utools.setSubInputValue()`。
 
 **验收标准**：主界面状态下搜索框输入「时间」仅剩时间戳/日期换算工具；回车直达；离开主界面恢复搜索框默认行为。
 
@@ -491,20 +494,23 @@ docs/
 | API | 用途 |
 | --- | --- |
 | `onPluginEnter` / `onPluginOut` | 接收入口 code 分发路由；退出时清理 |
-| `setSubInput` / `onSubInput` / `removeSubInput` | 主界面搜索框接管（4.8.3） |
+| `setSubInput` / `removeSubInput` / `setSubInputValue` | 主界面搜索框接管（4.8.3） |
 | `copyText` / `copyImage` | 结果复制 |
-| `db`（`dbStorage`） | 收藏、历史、设置持久化 |
-| `isDarkColors` | 暗色模式跟随 |
-| `outPlugin` | Esc 退出等快捷操作 |
-| `showNotification`（如可用） | 复制成功轻提示（降级为界面内提示） |
+| `dbStorage`（同步数据库键值存储） | 设置、收藏持久化 |
+| `getPluginLocalDataPath()`（经 preload 桥接） | 历史记录本地文件存储 |
+| `prefers-color-scheme` 媒体查询（官方推荐方式） | 暗色模式跟随 |
+| `outPlugin` | 退出插件应用 |
+| `setExpandHeight` | JSON 等大内容工具临时增高窗口 |
 
-### 6.4 数据存储设计（utools.db）
+### 6.4 数据存储设计
 
-| _id | 内容 | 说明 |
-| --- | --- | --- |
-| `devtools-kit/settings` | `{ theme: "auto"\|"light"\|"dark" }` | 用户设置 |
-| `devtools-kit/favorites` | `{ tools: ["timestamp", "base64", ...] }` | 收藏工具 id 列表 |
-| `devtools-kit/history/{toolId}` | `{ records: [{ input, output, ts }] }` | 每工具最多 50 条，LRU 淘汰 |
+依据官方《数据存储》规范分类：设置/收藏属于**用户数据**（适合同步数据库），历史记录属于**操作记录**（应存本地数据目录，不入同步库）。
+
+| 存储介质 | 键 / 路径 | 内容 | 说明 |
+| --- | --- | --- | --- |
+| `dbStorage` | `devtools-kit:settings` | `{ theme: "auto"\|"light"\|"dark" }` | 用户设置，参与 uTools 云同步 |
+| `dbStorage` | `devtools-kit:favorites` | `["timestamp", "base64", ...]` | 收藏工具 id 列表，参与云同步 |
+| 本地数据目录 `history.json` | `history[toolId]` | `[{ input, output, ts }]` | 历史记录，每工具最多 50 条 LRU 淘汰，不参与云同步 |
 
 ### 6.5 路由机制
 
@@ -573,7 +579,7 @@ docs/
 ## 11. 依赖与假设
 
 - **依赖**：uTools 客户端（最新稳定版）与开发者工具；Node.js ≥ 18；GitHub 仓库已就绪；
-- **假设**：uTools `db` API 在插件卸载前数据持久有效；`isDarkColors` 能实时反映主题变化；中文关键词的拼音/首字母搜索由 uTools 平台自动支持。
+- **假设**：`dbStorage` 数据在插件卸载前持久有效；`prefers-color-scheme` 媒体查询能实时反映 uTools 主题变化；中文关键词的拼音/首字母搜索由 uTools 平台自动支持。
 
 ---
 
