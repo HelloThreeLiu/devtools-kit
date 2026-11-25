@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>原型 · Base64 编解码</title>
+<link rel="stylesheet" href="assets/proto.css">
+</head>
+<body>
+<div class="app">
+
+  <div class="tool-header">
+    <button class="back-btn" data-nav="home">← 返回</button>
+    <span class="chip accent">B64</span>
+    <span class="title">Base64 编解码</span>
+    <span class="kw">base64 · encode · decode</span>
+    <span class="spacer"></span>
+    <button class="star" title="收藏">☆</button>
+    <button class="icon-btn" data-action="toggle-theme">🌙</button>
+  </div>
+
+  <div class="content">
+
+    <div class="seg" id="modeSeg" style="margin-bottom:10px">
+      <button class="active" data-mode="auto">自动识别</button>
+      <button data-mode="encode">编码</button>
+      <button data-mode="decode">解码</button>
+    </div>
+
+    <div class="card">
+      <div class="label">
+        输入 <span class="tag" id="modeTag">待输入</span>
+        <span style="flex:1"></span>
+        <button class="btn mini" id="btnClear">清空</button>
+      </div>
+      <textarea class="textarea" id="input" placeholder="输入任意文本进行编码；或输入 Base64 进行解码&#10;自动识别模式：内容符合 Base64 特征时默认解码，否则编码" spellcheck="false">你好，DevTools Kit</textarea>
+      <div class="err" id="err"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">输出 <span class="tag" id="outTag">—</span></div>
+      <div class="code-block" id="output"><span style="color:var(--muted)">等待输入…</span>
+        <button class="btn mini copy-corner" id="btnCopyOut">复制</button>
+      </div>
+      <div style="margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--muted)" id="stat"></div>
+    </div>
+
+    <details class="notes">
+      <summary>DESIGN NOTES · 设计说明（对应 PRD 4.3.2）</summary>
+      <ul>
+        <li>自动识别：命中 Base64 字符集且长度 %4===0 时默认解码，可手动锁定模式（功能要求）</li>
+        <li>UTF-8 安全：中文/Emoji 编解码往返正确（验收：你好 → 5L2g5aW9…）</li>
+        <li>URL-Safe 容错：<code>-</code>/<code>_</code> 自动归一化，缺省 padding 自动补齐（验收标准）</li>
+        <li>非法字符（如 <code>ab!c</code>）行内报错「包含非法字符」，不崩溃（验收标准）</li>
+        <li>底部实时统计字节数，辅助判断编码体积</li>
+      </ul>
+    </details>
+  </div>
+</div>
+
+<script src="assets/proto.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id)
+  let mode = 'auto' // auto | encode | decode
+  let lastResult = ''
+
+  const B64_RE = /^[A-Za-z0-9+/\-_]+={0,2}$/
+
+  function encodeB64(str) {
+    const bytes = new TextEncoder().encode(str)
+    let bin = ''
+    const CHUNK = 0x8000
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+    }
+    return { ok: true, data: btoa(bin), byteLen: bytes.length }
+  }
+
+  function decodeB64(str) {
+    let norm = str.trim().replace(/-/g, '+').replace(/_/g, '/')
+    while (norm.length % 4 !== 0) norm += '='
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(norm)) {
+      return { ok: false, error: '包含非法字符（Base64 仅支持 A-Z a-z 0-9 + / - _ =）' }
+    }
+    if (norm.replace(/=+$/, '').length % 4 === 1) {
+      return { ok: false, error: 'Base64 长度不合法（去除 padding 后长度对 4 取模不能为 1）' }
+    }
+    try {
+      const bin = atob(norm)
+      const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+      return { ok: true, data: text, byteLen: bytes.length }
+    } catch (e) {
+      return { ok: false, error: '解码失败：内容不是合法的 Base64 或不是有效的 UTF-8 文本' }
+    }
+  }
+
+  function looksLikeB64(str) {
+    const t = str.trim()
+    return t.length >= 4 && B64_RE.test(t)
+  }
+
+  function run() {
+    const raw = $('input').value
+    hideErr()
+    if (!raw) {
+      $('output').innerHTML = '<span style="color:var(--muted)">等待输入…</span>'
+      $('modeTag').textContent = '待输入'
+      $('outTag').textContent = '—'
+      $('stat').textContent = ''
+      return
+    }
+
+    let effMode = mode
+    if (mode === 'auto') {
+      effMode = looksLikeB64(raw) ? 'decode' : 'encode'
+      $('modeTag').textContent = '自动 → ' + (effMode === 'decode' ? '解码' : '编码')
+    } else {
+      $('modeTag').textContent = effMode === 'decode' ? '手动解码' : '手动编码'
+    }
+
+    const res = effMode === 'decode' ? decodeB64(raw) : encodeB64(raw)
+    if (!res.ok) {
+      $('output').innerHTML = '<span style="color:var(--muted)">—</span>'
+      $('outTag').textContent = '—'
+      $('stat').textContent = ''
+      return showErr(res.error)
+    }
+
+    const esc = window.protoEsc(res.data)
+    $('output').textContent = ''
+    $('output').insertAdjacentHTML('afterbegin', esc)
+    // 重新挂载复制角标（innerHTML 被清理过）
+    const btn = document.createElement('button')
+    btn.className = 'btn mini copy-corner'
+    btn.id = 'btnCopyOut'
+    btn.textContent = '复制'
+    $('output').appendChild(btn)
+    btn.addEventListener('click', () => window.protoCopy(lastResult || '', '结果'))
+
+    $('outTag').textContent = effMode === 'decode' ? 'Base64 → 文本' : '文本 → Base64'
+    $('stat').textContent =
+      `输入 ${new TextEncoder().encode(raw).length} B · 输出 ${res.data.length} 字符 · 输入内容 ${res.byteLen} B`
+    lastResult = res.data
+  }
+
+  function showErr(msg) {
+    const el = $('err')
+    el.textContent = '✋ ' + msg
+    el.classList.add('show')
+  }
+  function hideErr() { $('err').classList.remove('show') }
+
+  $('input').addEventListener('input', run)
+  $('btnClear').addEventListener('click', () => { $('input').value = ''; run(); $('input').focus() })
+
+  document.querySelectorAll('#modeSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modeSeg button').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      mode = btn.dataset.mode
+      run()
+    })
+  })
+
+  run()
+</script>
+</body>
+</html>

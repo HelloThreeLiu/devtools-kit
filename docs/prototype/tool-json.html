@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>原型 · JSON 格式化</title>
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  .json-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .json-toolbar .spacer { flex: 1; }
+  .meta {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="tool-header">
+    <button class="back-btn" data-nav="home">← 返回</button>
+    <span class="chip accent">JSON</span>
+    <span class="title">JSON 格式化</span>
+    <span class="kw">json · format · validate</span>
+    <span class="spacer"></span>
+    <button class="star fav" style="color:#f5a623" title="收藏">★</button>
+    <button class="icon-btn" data-action="toggle-theme">🌙</button>
+  </div>
+
+  <div class="content">
+
+    <div class="json-toolbar">
+      <div class="seg" id="indentSeg">
+        <button class="active" data-indent="2">2 空格</button>
+        <button data-indent="4">4 空格</button>
+        <button data-indent="\t">Tab</button>
+      </div>
+      <button class="btn" id="btnMinify">压缩为一行</button>
+      <span class="spacer"></span>
+      <span class="tag" id="validTag">校验中…</span>
+    </div>
+
+    <div class="card">
+      <div class="label">
+        输入 JSON
+        <span style="flex:1"></span>
+        <button class="btn mini" id="btnSample">示例</button>
+        <button class="btn mini" id="btnClear">清空</button>
+      </div>
+      <textarea class="textarea" id="input" style="min-height:96px" spellcheck="false"></textarea>
+      <div class="err" id="err"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">
+        格式化结果
+        <span style="flex:1"></span>
+        <button class="btn mini" id="btnCopyOut">复制</button>
+      </div>
+      <div class="code-block" id="output" style="max-height:180px"></div>
+      <div class="meta">
+        <span id="mLines">0 行</span>
+        <span id="mSize">0 B</span>
+        <span id="mKeys">—</span>
+      </div>
+    </div>
+
+    <details class="notes">
+      <summary>DESIGN NOTES · 设计说明（对应 PRD 4.3.4）</summary>
+      <ul>
+        <li>校验失败定位到 <code>行:列</code>（由 <code>SyntaxError.position</code> 换算），红色行内提示（验收标准）</li>
+        <li>语法高亮自研 tokenizer，不引入 highlight.js（包体积约束 §11.5）</li>
+        <li>输出 &gt; 5000 行截断渲染并提示，复制始终完整（Q2 首版策略）</li>
+        <li>大输入（&gt;100KB）debounce 200ms 再计算（§12 性能约定）</li>
+        <li>工具页可通过 <code>setExpandHeight(600)</code> 临时增高（plugin.json 默认 544）</li>
+      </ul>
+    </details>
+  </div>
+</div>
+
+<script src="assets/proto.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id)
+  let indent = '2'
+  let lastResult = ''
+
+  const SAMPLE = '{"name":"devtools-kit","version":"1.0.0","description":"uTools 开发工具箱","tools":[{"id":"timestamp","p0":true},{"id":"base64","p0":true},{"id":"json","p0":true}],"meta":{"author":"HelloThreeLiu","stars":42,"active":true,"repo":null}}'
+
+  /* ---------- 语法高亮 tokenizer ---------- */
+
+  function highlightJSON(src) {
+    const esc = window.protoEsc
+    const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(\btrue\b|\bfalse\b)|(\bnull\b)|([{}\[\],])/g
+    let out = '', i = 0, m
+    while ((m = re.exec(src))) {
+      out += esc(src.slice(i, m.index))
+      let cls = 'tk-pun'
+      if (m[1] && m[2]) out += `<span class="tk-key">${esc(m[1])}</span><span class="tk-pun">${esc(m[2])}</span>`
+      else if (m[1]) out += `<span class="tk-str">${esc(m[1])}</span>`
+      else if (m[3]) out += `<span class="tk-num">${esc(m[3])}</span>`
+      else if (m[4]) out += `<span class="tk-bool">${esc(m[4])}</span>`
+      else if (m[5]) out += `<span class="tk-bool">${esc(m[5])}</span>`
+      else out += `<span class="${cls}">${esc(m[0])}</span>`
+      i = m.index + m[0].length
+    }
+    out += esc(src.slice(i))
+    return out
+  }
+
+  /* ---------- 主逻辑 ---------- */
+
+  let debounceTimer = null
+
+  function run() {
+    const raw = $('input').value
+    hideErr()
+
+    if (!raw.trim()) {
+      $('validTag').textContent = '待输入'
+      $('output').innerHTML = '<span style="color:var(--muted)">粘贴 JSON 后自动格式化…</span>'
+      ;['mLines', 'mSize', 'mKeys'].forEach(id => $(id).textContent = id === 'mKeys' ? '—' : '0')
+      lastResult = ''
+      return
+    }
+
+    let parsed
+    try {
+      parsed = JSON.parse(raw)
+      $('validTag').textContent = '✓ 合法 JSON'
+      $('validTag').className = 'tag'
+    } catch (e) {
+      $('validTag').textContent = '✗ 语法错误'
+      $('validTag').className = 'tag warn'
+      $('output').innerHTML = '<span style="color:var(--muted)">—</span>'
+      $('mLines').textContent = '—'
+      $('mSize').textContent = '—'
+      $('mKeys').textContent = '—'
+      lastResult = ''
+      return showErr(e, raw)
+    }
+
+    const space = indent === '\\t' ? '\t' : Number(indent)
+    const text = JSON.stringify(parsed, null, space)
+    lastResult = text
+
+    const lines = text.split('\n')
+    const MAX = 5000
+    const shown = lines.length > MAX
+      ? lines.slice(0, MAX).join('\n') + `\n…（共 ${lines.length} 行，已截断显示，复制仍为完整内容）`
+      : text
+
+    $('output').innerHTML = highlightJSON(shown)
+
+    $('mLines').textContent = lines.length + ' 行' + (shown ? (lines.length > MAX ? '（截断显示）' : '') : '')
+    $('mSize').textContent = new TextEncoder().encode(raw).length + ' B'
+    const countKeys = (o) => {
+      if (Array.isArray(o)) return o.length + ' 项'
+      if (o && typeof o === 'object') return Object.keys(o).length + ' 个键'
+      return typeof o
+    }
+    $('mKeys').textContent = '根节点：' + countKeys(parsed)
+  }
+
+  function showErr(e, raw) {
+    let msg = e.message.replace(/^JSON\.parse:?\s*/i, '')
+    // V8: "Unexpected token x in JSON at position N" → 换算行列
+    const pm = e.message.match(/position (\d+)/i)
+    if (pm) {
+      const pos = Number(pm[1])
+      const before = raw.slice(0, pos)
+      const line = before.split('\n').length
+      const col = pos - before.lastIndexOf('\n')
+      msg = `第 ${line} 行 第 ${col} 列：${msg}`
+    }
+    const el = $('err')
+    el.textContent = '✋ ' + msg
+    el.classList.add('show')
+  }
+  function hideErr() { $('err').classList.remove('show') }
+
+  $('input').addEventListener('input', () => {
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(run, 200)
+  })
+
+  $('btnSample').addEventListener('click', () => { $('input').value = SAMPLE; run() })
+  $('btnClear').addEventListener('click', () => { $('input').value = ''; run(); $('input').focus() })
+  $('btnCopyOut').addEventListener('click', () => window.protoCopy(lastResult, '格式化结果'))
+
+  document.querySelectorAll('#indentSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#indentSeg button').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      indent = btn.dataset.indent
+      run()
+    })
+  })
+
+  $('btnMinify').addEventListener('click', () => {
+    if (!lastResult && !$('input').value.trim()) return
+    try {
+      lastResult = JSON.stringify(JSON.parse($('input').value))
+      $('output').innerHTML = highlightJSON(lastResult)
+      window.protoToast('已压缩为一行')
+    } catch (e) { showErr(e, $('input').value) }
+  })
+
+  // 初始示例
+  $('input').value = SAMPLE
+  run()
+</script>
+</body>
+</html>

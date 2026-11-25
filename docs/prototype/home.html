@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>原型 · 主界面</title>
+<link rel="stylesheet" href="assets/proto.css">
+<style>
+  .hint-bar {
+    margin-top: 16px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    display: flex;
+    gap: 16px;
+  }
+  .empty {
+    display: none;
+    padding: 28px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 顶栏：品牌 / 搜索（模拟 uTools 子输入框）/ 实时时间戳 / 主题 -->
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span>devtools-kit</div>
+    <div class="search">
+      <span>⌕</span>
+      <input id="filter" placeholder="搜索工具…（uTools 子输入框接管）" autocomplete="off">
+      <span class="kbd">↵</span>
+    </div>
+    <div class="live-clock">
+      <span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite"></span>
+      <span class="ts" id="clockTs">—</span>
+      <span id="clockTime">—</span>
+    </div>
+    <button class="icon-btn" data-action="toggle-theme">🌙</button>
+  </div>
+
+  <div class="with-rail">
+    <!-- 左侧分类栏 -->
+    <div class="rail" id="rail">
+      <div class="rail-item active" data-cat="all">全部 <span class="cnt">13</span></div>
+      <div class="rail-item" data-cat="codec">编解码 <span class="cnt">7</span></div>
+      <div class="rail-item" data-cat="datetime">时间日期 <span class="cnt">1</span></div>
+      <div class="rail-item" data-cat="text">文本生成 <span class="cnt">4</span></div>
+      <div class="rail-item" data-cat="design">设计辅助 <span class="cnt">1</span></div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content">
+      <div class="section-label">FAVORITES <span class="zh">我的收藏</span></div>
+      <div class="fav-row">
+        <div class="fav-pill" data-nav="tool-timestamp"><span class="chip accent">TS</span>时间戳转换</div>
+        <div class="fav-pill" data-nav="tool-json"><span class="chip accent">JSON</span>JSON 格式化</div>
+        <div class="fav-pill" data-nav="tool-base64"><span class="chip accent">B64</span>Base64 编解码</div>
+      </div>
+
+      <div class="section-label">RECENT <span class="zh">最近使用</span></div>
+      <div class="recent-row" id="recentRow">
+        <div class="recent-item" data-nav="tool-date-calc"><span class="chip">DC</span>日期换算 <span class="ago"></span></div>
+        <div class="recent-item"><span class="chip">HEX</span>进制转换 <span class="ago" data-min="60"></span></div>
+        <div class="recent-item"><span class="chip">UUID</span>UUID 生成 <span class="ago" data-min="185"></span></div>
+      </div>
+
+      <div class="section-label">ALL TOOLS <span class="zh">全部工具</span></div>
+      <div class="tool-grid" id="toolGrid">
+        <div class="tool-card" data-nav="tool-timestamp" data-cat="codec" data-kw="时间戳 timestamp 毫秒 unix ts">
+          <div class="row1"><span class="chip">TS</span><span class="name">时间戳转换</span>
+            <button class="star fav" title="收藏">★</button></div>
+          <div class="desc">秒/毫秒时间戳与日期双向转换</div>
+          <div class="kw">timestamp · unix</div>
+        </div>
+        <div class="tool-card" data-nav="tool-date-calc" data-cat="datetime" data-kw="日期换算 农历 星期 天数差 datecalc dc">
+          <div class="row1"><span class="chip">DC</span><span class="name">日期换算</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">农历、星期、年内序数、日期差</div>
+          <div class="kw">datecalc · lunar</div>
+        </div>
+        <div class="tool-card" data-nav="tool-base64" data-cat="codec" data-kw="base64 编码 解码 b64">
+          <div class="row1"><span class="chip">B64</span><span class="name">Base64 编解码</span>
+            <button class="star fav" title="收藏">★</button></div>
+          <div class="desc">文本与 Base64 双向转换，自动识别</div>
+          <div class="kw">base64 · encode</div>
+        </div>
+        <div class="tool-card" data-nav="tool-json" data-cat="codec" data-kw="json 格式化 校验 压缩">
+          <div class="row1"><span class="chip">JSON</span><span class="name">JSON 格式化</span>
+            <button class="star fav" title="收藏">★</button></div>
+          <div class="desc">格式化、压缩、校验并定位语法错误</div>
+          <div class="kw">json · format</div>
+        </div>
+        <div class="tool-card" data-cat="codec" data-kw="url 编码 解码 参数 uri">
+          <div class="row1"><span class="chip">URL</span><span class="name">URL 编解码</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">URL 编解码与查询参数结构化解析</div>
+          <div class="kw">url · uri</div>
+        </div>
+        <div class="tool-card" data-cat="codec" data-kw="进制 转换 hex 二进制 radix">
+          <div class="row1"><span class="chip">HEX</span><span class="name">进制转换</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">2/8/10/16 进制互转，大数安全</div>
+          <div class="kw">radix · hex</div>
+        </div>
+        <div class="tool-card" data-cat="text" data-kw="uuid guid 标识 生成">
+          <div class="row1"><span class="chip">UUID</span><span class="name">UUID 生成</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">UUID v4 批量生成，多种格式</div>
+          <div class="kw">uuid · v4</div>
+        </div>
+        <div class="tool-card" data-cat="codec" data-kw="哈希 md5 sha 摘要 hash">
+          <div class="row1"><span class="chip">HASH</span><span class="name">哈希计算</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">MD5 / SHA-1 / SHA-256 / SHA-512 <span class="tag" style="margin-left:4px">P1</span></div>
+          <div class="kw">hash · md5 · sha</div>
+        </div>
+        <div class="tool-card" data-cat="codec" data-kw="unicode 中文 转义 u4f60">
+          <div class="row1"><span class="chip">UNI</span><span class="name">Unicode 转中文</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">\uXXXX 转义与中文互转 <span class="tag" style="margin-left:4px">P1</span></div>
+          <div class="kw">unicode · \\u</div>
+        </div>
+        <div class="tool-card" data-cat="text" data-kw="二维码 扫码 qrcode">
+          <div class="row1"><span class="chip">QR</span><span class="name">二维码生成</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">文本转二维码，本地生成可复制 <span class="tag" style="margin-left:4px">P1</span></div>
+          <div class="kw">qrcode</div>
+        </div>
+        <div class="tool-card" data-cat="text" data-kw="命名 驼峰 下划线 转换 case">
+          <div class="row1"><span class="chip">CASE</span><span class="name">命名风格转换</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">camel / snake / kebab 五种互转 <span class="tag" style="margin-left:4px">P1</span></div>
+          <div class="kw">camelCase · snake_case</div>
+        </div>
+        <div class="tool-card" data-cat="text" data-kw="文本 统计 字数 行数 stat">
+          <div class="row1"><span class="chip">STAT</span><span class="name">文本统计</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">字数、行数、UTF-8 字节数统计 <span class="tag" style="margin-left:4px">P1</span></div>
+          <div class="kw">count · utf8</div>
+        </div>
+        <div class="tool-card" data-cat="design" data-kw="颜色 hex rgb hsl 取色 color">
+          <div class="row1"><span class="chip">CLR</span><span class="name">颜色格式转换</span>
+            <button class="star" title="收藏">☆</button></div>
+          <div class="desc">HEX / RGB / HSL 互转与预览 <span class="tag" style="margin-left:4px">P1</span></div>
+          <div class="kw">color · hex · hsl</div>
+        </div>
+      </div>
+      <div class="empty" id="empty">没有匹配的工具，换个关键词试试</div>
+
+      <div class="hint-bar">
+        <span>↵ 进入首个匹配</span>
+        <span>Esc 隐藏 uTools（遵循宿主行为）</span>
+        <span>历史与收藏仅存本机</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/proto.js"></script>
+<script>
+  // 实时时钟：毫秒时间戳 + 时钟
+  protoTick((now) => {
+    document.getElementById('clockTs').textContent = now.getTime()
+    document.getElementById('clockTime').textContent =
+      now.toTimeString().slice(0, 8)
+  })
+
+  // 最近使用相对时间
+  document.querySelectorAll('#recentRow .ago').forEach(el => {
+    const min = Number(el.dataset.min || 2)
+    el.textContent = protoTimeAgo(Date.now() - min * 60000)
+  })
+
+  // 收藏星标（原型演示：仅切换状态）
+  document.querySelectorAll('.star').forEach(st => {
+    st.addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      const fav = st.classList.toggle('fav')
+      st.textContent = fav ? '★' : '☆'
+      window.protoToast(fav ? '已收藏（演示）' : '已取消收藏（演示）')
+    })
+  })
+
+  // 分类过滤
+  let curCat = 'all'
+  document.querySelectorAll('.rail-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.rail-item').forEach(i => i.classList.remove('active'))
+      item.classList.add('active')
+      curCat = item.dataset.cat
+      applyFilter()
+    })
+  })
+
+  // 关键词过滤
+  document.getElementById('filter').addEventListener('input', applyFilter)
+
+  function applyFilter() {
+    const kw = document.getElementById('filter').value.trim().toLowerCase()
+    let visible = 0
+    document.querySelectorAll('.tool-card').forEach(card => {
+      const hitCat = curCat === 'all' || card.dataset.cat === curCat
+      const hitKw = !kw ||
+        card.textContent.toLowerCase().includes(kw) ||
+        (card.dataset.kw || '').toLowerCase().includes(kw)
+      const show = hitCat && hitKw
+      card.style.display = show ? '' : 'none'
+      if (show) visible++
+    })
+    document.getElementById('empty').style.display = visible ? 'none' : 'block'
+  }
+</script>
+</body>
+</html>

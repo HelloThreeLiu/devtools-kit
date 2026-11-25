@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>原型 · 时间戳转换</title>
+<link rel="stylesheet" href="assets/proto.css">
+</head>
+<body>
+<div class="app">
+
+  <div class="tool-header">
+    <button class="back-btn" data-nav="home">← 返回</button>
+    <span class="chip accent">TS</span>
+    <span class="title">时间戳转换</span>
+    <span class="kw">timestamp · unix</span>
+    <span class="spacer"></span>
+    <button class="star fav" style="color:#f5a623" title="收藏">★</button>
+    <button class="icon-btn" data-action="toggle-theme">🌙</button>
+  </div>
+
+  <div class="content">
+
+    <!-- 模式切换 -->
+    <div class="seg" id="modeSeg" style="margin-bottom:10px">
+      <button class="active" data-mode="ts2date">时间戳 → 日期</button>
+      <button data-mode="date2ts">日期 → 时间戳</button>
+    </div>
+
+    <!-- 方向一：时间戳 → 日期 -->
+    <div id="paneTs2Date">
+      <div class="card">
+        <div class="label">输入时间戳（自动识别 10 位秒 / 13 位毫秒）</div>
+        <input class="input" id="tsInput" placeholder="如 1735689600 或 1735689600000" value="1735689600000" spellcheck="false">
+        <div class="err" id="tsErr"></div>
+      </div>
+
+      <div class="card" id="tsOutCard">
+        <div class="label">转换结果 <span class="tag" id="tsUnit"></span></div>
+        <div class="def-rows">
+          <div class="def-row"><span class="k">本地时间</span><span class="v" id="oLocal">—</span>
+            <button class="copy-mini" data-copy-set="oLocal" title="复制">⧉</button></div>
+          <div class="def-row"><span class="k">UTC 时间</span><span class="v" id="oUtc">—</span>
+            <button class="copy-mini" data-copy-set="oUtc" title="复制">⧉</button></div>
+          <div class="def-row"><span class="k">ISO 8601</span><span class="v" id="oIso">—</span>
+            <button class="copy-mini" data-copy-set="oIso" title="复制">⧉</button></div>
+          <div class="def-row"><span class="k">星期</span><span class="v" id="oWeek">—</span>
+            <button class="copy-mini" data-copy-set="oWeek" title="复制">⧉</button></div>
+          <div class="def-row"><span class="k">相对时间</span><span class="v" id="oRel">—</span>
+            <button class="copy-mini" data-copy-set="oRel" title="复制">⧉</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 方向二：日期 → 时间戳 -->
+    <div id="paneDate2Ts" style="display:none">
+      <div class="card">
+        <div class="label">输入日期时间（支持 YYYY-MM-DD HH:mm:ss / YYYY/MM/DD / YYYY-MM-DD / ISO 8601）</div>
+        <div style="display:flex;gap:8px">
+          <input class="input" id="dateInput" placeholder="如 2025-01-01 08:00:00" spellcheck="false">
+          <button class="btn" id="btnNow">现在</button>
+          <button class="btn" id="btnToday">今天</button>
+        </div>
+        <div class="err" id="dateErr"></div>
+      </div>
+
+      <div class="card">
+        <div class="label">转换结果</div>
+        <div class="def-rows">
+          <div class="def-row"><span class="k">秒级</span><span class="v" id="oSec">—</span>
+            <button class="copy-mini" data-copy-set="oSec" title="复制">⧉</button></div>
+          <div class="def-row"><span class="k">毫秒级</span><span class="v" id="oMs">—</span>
+            <button class="copy-mini" data-copy-set="oMs" title="复制">⧉</button></div>
+          <div class="def-row"><span class="k">对应时刻</span><span class="v" id="oEcho">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 当前时间戳实时条 -->
+    <div class="live-strip" style="margin-top:12px">
+      <span class="dot"></span>
+      <span style="color:var(--muted)">当前时间戳</span>
+      <strong id="nowMs">—</strong>
+      <span style="color:var(--muted)">ms · <span id="nowZone"></span></span>
+      <span style="flex:1"></span>
+      <button class="btn mini" id="btnCopyNow">复制</button>
+    </div>
+
+    <!-- 设计说明 -->
+    <details class="notes">
+      <summary>DESIGN NOTES · 设计说明（对应 PRD 4.3.1）</summary>
+      <ul>
+        <li>输入即转换：输入变化 ≤ 100ms 出结果，无「转换」按钮（PRD 4.2-1）</li>
+        <li>每个结果独立复制：<code>⧉</code>；<code>Ctrl+Enter</code> 复制主结果（PRD 4.2-2）</li>
+        <li>位数识别规则：10 位=秒、13 位=毫秒、16 位提示不支持；其余报错不输出（验收标准）</li>
+        <li>相对时间每 30s 随时钟刷新；时区在实时条注明（验收标准）</li>
+        <li>呼起即聚焦输入框、<code>Ctrl+V</code> 粘贴即用（PRD 4.2-3）</li>
+      </ul>
+    </details>
+  </div>
+</div>
+
+<script src="assets/proto.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id)
+
+  /* ---------- 方向一：时间戳 → 日期 ---------- */
+
+  function showErr(id, msg) {
+    const el = $(id)
+    el.textContent = '✋ ' + msg
+    el.classList.add('show')
+  }
+  function hideErr(id) { $(id).classList.remove('show') }
+
+  function convertTs() {
+    const raw = $('tsInput').value.trim()
+    hideErr('tsErr')
+    if (!raw) {
+      $('tsUnit').textContent = ''
+      ;['oLocal', 'oUtc', 'oIso', 'oWeek', 'oRel'].forEach(id => $(id).textContent = '—')
+      return
+    }
+    if (!/^\d+$/.test(raw)) return showErr('tsErr', '仅支持数字时间戳')
+    let ms
+    if (raw.length === 10) { ms = Number(raw) * 1000; $('tsUnit').textContent = '识别为秒级' }
+    else if (raw.length === 13) { ms = Number(raw); $('tsUnit').textContent = '识别为毫秒级' }
+    else if (raw.length === 16) {
+      $('tsUnit').textContent = ''
+      return showErr('tsErr', '检测到 16 位微秒级时间戳，暂不支持，请先换算为毫秒（÷1000）')
+    }
+    else return showErr('tsErr', `无法识别的时间戳位数（${raw.length} 位，支持 10 / 13 位）`)
+
+    const d = new Date(ms)
+    $('oLocal').textContent = protoFmt(d)
+    $('oUtc').textContent = d.toUTCString()
+    $('oIso').textContent = d.toISOString()
+    $('oWeek').textContent = protoWeek(d)
+    $('oRel').textContent = protoRel(ms)
+  }
+
+  $('tsInput').addEventListener('input', convertTs)
+  convertTs()
+
+  // 相对时间随时钟刷新
+  setInterval(() => { if ($('tsInput').value.trim()) convertTs() }, 30000)
+
+  /* ---------- 方向二：日期 → 时间戳 ---------- */
+
+  function parseDate(str) {
+    str = str.trim()
+    const patterns = [
+      /^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/,
+      /^(\d{4})\/(\d{1,2})\/(\d{1,2})[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/,
+      /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+      /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/,
+    ]
+    for (const re of patterns) {
+      const m = str.match(re)
+      if (m) {
+        const [, y, mo, d, h = 0, mi = 0, s = 0] = m.map(Number)
+        const date = new Date(y, mo - 1, d, h, mi, s)
+        // 严格校验（防止 2 月 30 日这类输入被自动进位）
+        if (date.getFullYear() === y && date.getMonth() === mo - 1 && date.getDate() === d) return date
+        return null
+      }
+    }
+    // ISO 8601 交由原生解析（含时区信息）
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/.test(str)) {
+      const d = new Date(str)
+      return isNaN(d) ? null : d
+    }
+    return null
+  }
+
+  function convertDate() {
+    const raw = $('dateInput').value
+    hideErr('dateErr')
+    if (!raw.trim()) {
+      ;['oSec', 'oMs', 'oEcho'].forEach(id => $(id).textContent = '—')
+      return
+    }
+    const d = parseDate(raw)
+    if (!d) return showErr('dateErr', '无法解析，支持的格式：YYYY-MM-DD HH:mm:ss / YYYY/MM/DD / YYYY-MM-DD / ISO 8601')
+    const ms = d.getTime()
+    $('oSec').textContent = String(Math.floor(ms / 1000))
+    $('oMs').textContent = String(ms)
+    $('oEcho').textContent = protoFmt(d) + ' · ' + protoWeek(d)
+  }
+
+  $('dateInput').addEventListener('input', convertDate)
+  $('btnNow').addEventListener('click', () => {
+    const n = new Date()
+    const p = (x) => String(x).padStart(2, '0')
+    $('dateInput').value = `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`
+    convertDate()
+  })
+  $('btnToday').addEventListener('click', () => {
+    const n = new Date()
+    const p = (x) => String(x).padStart(2, '0')
+    $('dateInput').value = `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`
+    convertDate()
+  })
+
+  /* ---------- 当前时间戳实时条 ---------- */
+
+  protoTick((now) => {
+    $('nowMs').textContent = now.getTime()
+    const off = -now.getTimezoneOffset() / 60
+    $('nowZone').textContent = `UTC${off >= 0 ? '+' : ''}${off}`
+  })
+  $('btnCopyNow').addEventListener('click', () => window.protoCopy($('nowMs').textContent, '当前时间戳'))
+
+  /* ---------- 模式切换 ---------- */
+
+  document.querySelectorAll('#modeSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modeSeg button').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      const isTs = btn.dataset.mode === 'ts2date'
+      $('paneTs2Date').style.display = isTs ? '' : 'none'
+      $('paneDate2Ts').style.display = isTs ? 'none' : ''
+      ;(isTs ? $('tsInput') : $('dateInput')).focus()
+    })
+  })
+
+  // Ctrl+Enter 复制主结果
+  document.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+      const active = document.querySelector('#paneTs2Date').style.display === 'none'
+        ? $('oMs') : $('oLocal')
+      window.protoCopy(active.textContent, '主结果')
+    }
+  })
+
+  // 复制指定输出行
+  document.querySelectorAll('[data-copy-set]').forEach(btn => {
+    btn.addEventListener('click', () => window.protoCopy($(btn.dataset.copySet).textContent))
+  })
+</script>
+</body>
+</html>
