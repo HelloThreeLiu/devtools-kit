@@ -15,6 +15,36 @@
       "code": "timestamp",
       "description": "时间戳与日期时间双向转换",
       "cmds": ["时间戳", "时间戳转换", "timestamp"]
+    },
+    {
+      "code": "base64",
+      "description": "Base64 编码与解码，自动识别方向",
+      "cmds": ["base64", "Base64转码", "base64编码"]
+    },
+    {
+      "code": "url-codec",
+      "description": "URL 编码解码与查询参数解析",
+      "cmds": ["url编码", "url解码", "URL编解码"]
+    },
+    {
+      "code": "json",
+      "description": "JSON 格式化、压缩与校验定位",
+      "cmds": ["json", "JSON格式化", "json校验"]
+    },
+    {
+      "code": "radix",
+      "description": "2/8/10/16 进制互转，大数安全",
+      "cmds": ["进制转换", "进制", "hex转十进制"]
+    },
+    {
+      "code": "uuid",
+      "description": "UUID v4 批量生成",
+      "cmds": ["uuid", "UUID生成", "guid"]
+    },
+    {
+      "code": "date-calc",
+      "description": "日期换算：农历、星期、年内序数、日期差",
+      "cmds": ["日期换算", "农历", "日期计算", "datecalc"]
     }
   ]
 }

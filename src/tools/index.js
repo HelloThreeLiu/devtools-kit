@@ -4,6 +4,12 @@
  *       3) utils/convert/<id>.js 纯函数（可选）  4) public/plugin.json 增加 feature
  */
 import TimestampTool from './timestamp/index.vue'
+import Base64Tool from './base64/index.vue'
+import UrlCodecTool from './url-codec/index.vue'
+import JsonTool from './json/index.vue'
+import RadixTool from './radix/index.vue'
+import UuidTool from './uuid/index.vue'
+import DateCalcTool from './date-calc/index.vue'
 
 /** 主入口 feature.code（指向主界面） */
 export const MAIN_CODE = 'devtools-kit'
@@ -52,7 +58,7 @@ export const tools = [
     priority: 'P0',
     cmds: ['base64', 'Base64转码', 'base64编码'],
     keywords: 'encode decode 编码 解码 b64',
-    component: null, // M3
+    component: Base64Tool,
   },
   {
     id: 'url-codec',
@@ -64,7 +70,7 @@ export const tools = [
     priority: 'P0',
     cmds: ['url编码', 'url解码', 'URL编解码'],
     keywords: 'uri encode decode 参数 转义',
-    component: null, // M3
+    component: UrlCodecTool,
   },
   {
     id: 'json',
@@ -76,7 +82,7 @@ export const tools = [
     priority: 'P0',
     cmds: ['json', 'JSON格式化', 'json校验'],
     keywords: 'format 格式化 校验 压缩',
-    component: null, // M3
+    component: JsonTool,
   },
   {
     id: 'radix',
@@ -88,7 +94,7 @@ export const tools = [
     priority: 'P0',
     cmds: ['进制转换', '进制', 'hex转十进制'],
     keywords: 'hex bin oct 二进制 八进制 十六进制 0x bigint',
-    component: null, // M3
+    component: RadixTool,
   },
   {
     id: 'hash',
@@ -124,7 +130,7 @@ export const tools = [
     priority: 'P0',
     cmds: ['日期换算', '农历', '日期计算', 'datecalc'],
     keywords: '时间日期 农历 星期 天数差 lunar iso 周',
-    component: null, // M3
+    component: DateCalcTool,
   },
   {
     id: 'uuid',
@@ -136,7 +142,7 @@ export const tools = [
     priority: 'P0',
     cmds: ['uuid', 'UUID生成', 'guid'],
     keywords: 'guid 标识 生成 v4',
-    component: null, // M3
+    component: UuidTool,
   },
   {
     id: 'case-convert',
