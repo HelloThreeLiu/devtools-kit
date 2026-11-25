@@ -268,6 +268,20 @@ a { color: inherit; text-decoration: none; }
 .btn:hover { background: var(--surface-2); }
 .btn:active { background: var(--accent-weak); }
 
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: var(--fw-semibold);
+}
+.btn.primary:hover { background: var(--accent); filter: brightness(1.08); }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
 .btn--ghost { border-color: transparent; background: transparent; color: var(--muted); }
 .btn--ghost:hover { background: var(--surface-2); color: var(--fg); }
 
@@ -485,6 +499,9 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.02em;
   color: var(--muted);
 }
+
+/* 「全部工具」行高 38px，标题行高随之对齐 */
+.section--all > h2 { line-height: var(--h-row); }
 
 .section-body { min-width: 0; }
 
@@ -1070,6 +1087,62 @@ a { color: inherit; text-decoration: none; }
   font-size: var(--fs-13);
   user-select: text;
 }
+
+/* ======================= 分段控制器（模式 / 缩进 / 进制） ======================= */
+
+.seg {
+  display: inline-flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.seg button {
+  height: var(--h-control-sm);
+  padding: 0 var(--sp-12);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: var(--fs-13);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.seg button:hover { color: var(--fg); }
+
+/* 既用于互斥切换（aria-pressed），也用于单选组（aria-checked） */
+.seg button[aria-pressed="true"],
+.seg button[aria-checked="true"] {
+  background: var(--surface);
+  color: var(--accent-text);
+  font-weight: var(--fw-semibold);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.14);
+}
+
+/* ======================= 多行输入 ======================= */
+
+.textarea {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 72px;
+  padding: var(--sp-10) var(--sp-12);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--fs-13);
+  line-height: var(--lh-mono);
+  resize: none;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.textarea::placeholder { color: var(--muted); font-family: var(--ui); }
+.textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+.textarea[aria-invalid="true"] { border-color: var(--danger-fill); }
+.textarea[aria-invalid="true"]:focus { box-shadow: var(--danger-ring); }
 
 /* ======================= 动效降级 ======================= */
 

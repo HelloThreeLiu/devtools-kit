@@ -103,7 +103,7 @@ onMounted(() => inputEl.value?.focus())
     <div class="panel" v-if="res.ok">
       <div class="panel-head">
         <span>转换结果（{{ baseName }}进制输入）</span>
-        <span v-if="res.warning" class="tag tag--err">{{ res.warning }}</span>
+        <span v-if="res.warning" class="tag">{{ res.warning }}</span>
         <span class="grow"></span>
       </div>
       <div v-for="r in rows" :key="r.key" class="kv">
