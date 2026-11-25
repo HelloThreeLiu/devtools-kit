@@ -1,259 +1,472 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-zcode-design>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DevTools Kit · 原型审阅台</title>
 <link rel="stylesheet" href="assets/proto.css">
+<script src="assets/proto.js"></script>
 <style>
-  body { display: block; padding: 0; }
-  .hub {
-    display: flex;
-    min-height: 100vh;
-    max-width: 1160px;
-    margin: 0 auto;
-    gap: 28px;
-    padding: 32px 24px;
-  }
-  .hub-side { width: 280px; flex-shrink: 0; }
-  .hub-title {
-    font-family: var(--mono);
-    font-weight: 700;
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 4px;
-  }
-  .hub-title .mark { width: 12px; height: 22px; background: var(--accent); border-radius: 3px; }
-  .hub-sub { font-size: 12px; color: var(--muted); margin-bottom: 22px; }
-
-  .page-list { display: flex; flex-direction: column; gap: 4px; }
-  .page-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 7px;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.12s;
-  }
-  .page-item:hover { background: var(--surface); border-color: var(--border); }
-  .page-item.active { background: var(--surface); border-color: var(--accent); }
-  .page-item .pi-name { font-size: 13px; font-weight: 600; }
-  .page-item .pi-desc { font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .page-item .pi-key {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--muted);
-    border: 1px solid var(--border-strong);
-    border-radius: 4px;
-    padding: 0 5px;
+  /* ---------- 审阅台外壳（仅本页使用）---------- */
+  :root {
+    --hub-bg: #eef1f4;
+    --hub-bar: #f4f5f7;
+    --hub-tag: #e3e6ea;
   }
 
-  .hub-panel {
-    margin-top: 22px;
+  html[data-theme="dark"] {
+    --hub-bg: #141619;
+    --hub-bar: #26292f;
+    --hub-tag: #35393f;
+  }
+
+  body.hub { display: block; height: auto; min-height: 100%; background: var(--hub-bg); }
+
+  .hub-bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 60px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 14px;
   }
-  .hub-panel h4 {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    color: var(--muted);
-    margin-bottom: 8px;
+
+  .hub-logo { flex: none; width: 28px; height: 28px; border-radius: 7px; }
+
+  .hub-title { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-16); white-space: nowrap; }
+  .hub-title strong { font-weight: 600; }
+  .hub-title span { font-size: var(--fs-13); color: var(--muted); }
+
+  .hub-meta { margin: 0 0 0 8px; font-size: var(--fs-12); color: var(--muted); white-space: nowrap; }
+
+  .hub-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
   }
-  .hub-panel label {
+
+  .hub-side { flex: none; width: 296px; display: flex; flex-direction: column; gap: 16px; }
+
+  .hub-h { margin-bottom: 8px; font-size: var(--fs-12); font-weight: 400; letter-spacing: 0.02em; color: var(--muted); }
+
+  .page-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+
+  .page-item {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    padding: 3px 0;
-    cursor: pointer;
+    gap: 10px;
+    width: 100%;
+    min-height: 46px;
+    padding: 6px 6px 6px 10px;
+    border-radius: var(--radius);
     color: var(--fg);
+    text-align: left;
+    transition: background-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
   }
-  .hub-panel input { accent-color: var(--accent); }
 
-  .stage { flex: 1; min-width: 0; }
+  .page-item:hover { background: var(--surface); }
+  .page-item .icon { color: var(--muted); }
+  .page-item[aria-current="page"] { background: var(--surface); box-shadow: inset 2px 0 0 var(--accent); }
+  .page-item[aria-current="page"] .icon { color: var(--fg); }
+
+  .pi-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .pi-name { font-size: var(--fs-14); line-height: 1.4; }
+  .pi-desc { font-size: var(--fs-12); line-height: 1.5; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .hub-panel { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+  .hub-panel .hub-h { margin-bottom: 10px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .state-chip {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: var(--fs-12);
+    letter-spacing: 0.02em;
+    transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+
+  .state-chip:hover { border-color: var(--accent); background: var(--accent-weak); color: var(--accent-text); }
+  .state-chip[aria-pressed="true"] { border-color: var(--accent-text); background: var(--accent-weak); color: var(--accent-text); }
+
+  .hub-check { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+  .hub-check label { display: flex; align-items: flex-start; gap: 8px; font-size: var(--fs-13); line-height: 1.5; cursor: pointer; }
+  .hub-check input { flex: none; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+  .hub-check input:checked + span { color: var(--muted); }
+
+  /* ---------- 舞台：uTools 主窗口模拟 ---------- */
+  .hub-stage { flex: none; min-width: 0; width: 800px; max-width: 100%; }
+
+  .stage-fit { width: 800px; transform-origin: top left; }
+
   .uwindow {
     width: 800px;
-    border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border-strong);
-    box-shadow: 0 24px 60px -18px rgba(16, 24, 40, 0.35), 0 4px 14px rgba(16, 24, 40, 0.12);
-    background: var(--surface);
-  }
-  .usearch {
-    height: 44px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-  }
-  .usearch .upill {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 15px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .usearch .upill .ulogo {
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    background: linear-gradient(135deg, var(--accent), #7cb8ff);
-    flex-shrink: 0;
-  }
-  .stage-note {
-    margin-top: 12px;
-    font-size: 11px;
-    color: var(--muted);
-    font-family: var(--mono);
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-  }
-  iframe {
-    display: block;
-    width: 800px;
-    height: 500px;
-    border: 0;
+    border-radius: 10px;
     background: var(--bg);
+    box-shadow: 0 24px 48px -16px rgba(16, 24, 40, 0.24), 0 2px 8px rgba(16, 24, 40, 0.08);
+  }
+
+  /* 主输入栏：结构参照官方文档 setSubInput 效果图（指令标签 + 子输入框 + 菜单与插件图标） */
+  .ubar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 52px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--hub-bar);
+  }
+
+  .utag {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 14px;
+    background: var(--hub-tag);
+    font-size: var(--fs-13);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .uinput {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    font-size: var(--fs-14);
+    outline: none;
+  }
+
+  .uinput::placeholder { color: var(--muted); }
+  .uinput:disabled { color: var(--muted); -webkit-text-fill-color: var(--muted); opacity: 1; cursor: default; }
+  .ubar .icon { color: var(--muted); }
+  .ulogo { flex: none; width: 28px; height: 28px; border-radius: 50%; }
+
+  iframe { display: block; width: 800px; height: 544px; border: 0; background: var(--bg); }
+
+  .hub-caption { margin: 12px 0 0; font-size: var(--fs-14); line-height: 1.7; color: var(--muted); }
+
+  /* ---------- 设计说明：舞台下方，展开后双栏 ---------- */
+  .hub-notes { margin-top: 16px; }
+
+  .hub-notes > summary { font-size: var(--fs-12); letter-spacing: 0.02em; color: var(--muted); cursor: pointer; }
+  .hub-notes[open] > summary { margin-bottom: 12px; }
+
+  .hub-notes .cols { columns: 2; column-gap: 32px; }
+  .hub-notes section { break-inside: avoid; margin-bottom: 12px; }
+  .hub-notes h3 { margin: 0 0 4px; font-size: var(--fs-14); font-weight: 600; line-height: 1.5; }
+  .hub-notes ul { margin: 0; padding-left: 18px; }
+  .hub-notes li { font-size: var(--fs-14); line-height: 1.7; color: var(--muted); }
+  .hub-notes code { font-family: var(--mono); font-size: var(--fs-13); color: var(--fg); }
+  .hub-notes b { font-weight: 600; color: var(--fg); }
+
+  @media (max-width: 1199px) {
+    .hub-layout { flex-direction: column; align-items: stretch; }
+    .hub-side { width: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .hub-meta { display: none; }
+    /* 评审要点横跨两栏，条目分两列排（多栏排版对 flex 容器无效，这里改回块级） */
+    .hub-side section[aria-labelledby="h-check"] { grid-column: 1 / -1; }
+    .hub-check { display: block; columns: 2; column-gap: 24px; }
+    .hub-check li { break-inside: avoid; margin-bottom: 8px; }
+  }
+
+  @media (max-width: 719px) {
+    .hub-bar { padding: 0 16px; }
+    .hub-layout { padding: 16px; gap: 16px; }
+    .hub-side { grid-template-columns: minmax(0, 1fr); }
+    .hub-title span { display: none; }
+    .hub-check { columns: 1; }
+    .hub-check input { width: 24px; height: 24px; margin: 0; }    .hub-notes .cols { columns: 1; }
   }
 </style>
 </head>
-<body>
-<div class="hub">
+<body class="hub">
 
-  <div class="hub-side">
-    <div class="hub-title"><span class="mark"></span>DevTools Kit · 原型审阅台</div>
-    <div class="hub-sub">高保真可交互原型 · 对应 PRD v0.2 / 技术设计 v0.1 · 审阅通过后进入 M2 架构搭建</div>
+<header class="hub-bar">
+  <img class="hub-logo" src="assets/logo-devtools-kit.png" alt="">
+  <div class="hub-title"><strong>DevTools Kit</strong><span>原型审阅台</span></div>
+  <p class="hub-meta">依据 PRD v0.2 · 技术设计 v0.1</p>
+  <span class="grow"></span>
+  <div class="seg" role="group" aria-label="外观">
+    <button type="button" data-theme-option="auto" aria-checked="false" title="跟随系统">跟随系统</button>
+    <button type="button" data-theme-option="light" aria-checked="false" title="亮色">亮色</button>
+    <button type="button" data-theme-option="dark" aria-checked="false" title="暗色">暗色</button>
+  </div>
+</header>
 
-    <div class="page-list" id="pageList">
-      <div class="page-item active" data-page="home">
-        <span class="chip accent">HOME</span>
-        <div><div class="pi-name">主界面</div>
-          <div class="pi-desc">分类导航 / 搜索过滤 / 收藏 / 最近使用</div></div>
-        <span class="pi-key">1</span>
-      </div>
-      <div class="page-item" data-page="tool-timestamp">
-        <span class="chip">TS</span>
-        <div><div class="pi-name">时间戳转换</div>
-          <div class="pi-desc">双向转换 · 真实逻辑可验收（标准工具页范式）</div></div>
-        <span class="pi-key">2</span>
-      </div>
-      <div class="page-item" data-page="tool-base64">
-        <span class="chip">B64</span>
-        <div><div class="pi-name">Base64 编解码</div>
-          <div class="pi-desc">自动识别模式 · 真实编解码</div></div>
-        <span class="pi-key">3</span>
-      </div>
-      <div class="page-item" data-page="tool-json">
-        <span class="chip">JSON</span>
-        <div><div class="pi-name">JSON 格式化</div>
-          <div class="pi-desc">高亮 / 错误定位 / 截断策略（复杂布局范式）</div></div>
-        <span class="pi-key">4</span>
-      </div>
-      <div class="page-item" data-page="tool-date-calc">
-        <span class="chip">DC</span>
-        <div><div class="pi-name">日期换算</div>
-          <div class="pi-desc">信息卡布局范式 · 农历为演示数据</div></div>
-        <span class="pi-key">5</span>
+<div class="hub-layout">
+
+  <aside class="hub-side">
+    <nav aria-labelledby="h-pages">
+      <h2 class="hub-h" id="h-pages">页面</h2>
+      <ol class="page-list" id="pageList"></ol>
+    </nav>
+
+    <section class="hub-panel" aria-labelledby="h-states">
+      <h2 class="hub-h" id="h-states">状态预览</h2>
+      <div class="chips" id="stateChips"></div>
+    </section>
+
+    <section class="hub-panel" aria-labelledby="h-check">
+      <h2 class="hub-h" id="h-check">评审要点</h2>
+      <ul class="hub-check" id="checklist"></ul>
+    </section>
+  </aside>
+
+  <div class="hub-stage">
+    <div class="stage-fit" id="stageFit">
+      <div class="uwindow">
+        <div class="ubar">
+          <span class="utag" id="utag">开发工具箱</span>
+          <input class="uinput" id="uinput" aria-label="模拟 uTools 主输入框" placeholder="搜索工具…" autocomplete="off" spellcheck="false">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-dots"></use></svg>
+          <img class="ulogo" src="assets/logo-devtools-kit.png" alt="">
+        </div>
+        <iframe id="frame" src="home.html" title="原型页面"></iframe>
       </div>
     </div>
+    <p class="hub-caption">uTools 主窗口模拟：上方是主输入框，下方是 800 × 544 的插件区域。主界面下可直接在输入框里过滤工具，按 ↓ 进入列表、按 Enter 打开首个匹配。数字键 1–5 切换页面。</p>
 
-    <div class="hub-panel">
-      <h4>REVIEW CHECKLIST · 评审要点</h4>
-      <label><input type="checkbox"> 800×544 内无横向溢出、无多余滚动</label>
-      <label><input type="checkbox"> 输入即转换，无「转换」按钮（PRD 4.2-1）</label>
-      <label><input type="checkbox"> 每个结果可独立复制 + Toast（4.2-2）</label>
-      <label><input type="checkbox"> 非法输入行内报错，不白屏（4.2-4）</label>
-      <label><input type="checkbox"> 空态有用法示例引导（4.2-5）</label>
-      <label><input type="checkbox"> 暗色模式下对比度可读（PRD 4.7.3）</label>
-      <label><input type="checkbox"> 视觉风格符合「精密仪表」定位</label>
-    </div>
+    <details class="hub-panel hub-notes" id="notes">
+      <summary>设计说明与待确认事项</summary>
+      <div class="cols">
+        <section>
+          <h3>已定事项（2026-11-25 评审结论，写入 PRD v0.3 / 技术设计 v0.2）</h3>
+          <ul>
+            <li><b>PRD 4.3.1 矛盾</b>：修订为<b>数量级阈值识别，不限位数</b>——&lt; 10¹¹ 秒、10¹¹–10¹⁴ 毫秒、10¹⁴–10¹⁸ 微秒（÷1000）、≥ 10¹⁸ 超范围报错。输入 <code>0</code> → 1970-01-01 08:00:00 成立；原型原「仅 10/13 位」实现已按新规则调整（5 位 <code>12345</code> 现按秒识别为 1970-01-01 08:20:45，后缀标签透明标注单位）。</li>
+            <li><b>API 名</b>：核实为 <code>setExpandHeight</code>——utools-api-types 8.x 定义 <code>setExpandHeight(height): boolean</code>，与现行官方文档一致；<code>setExpendHeight</code> 是旧版本的拼写，不采用。本审阅台此前注记有误。</li>
+            <li><b>时间戳自动方向</b>：定稿保留，不恢复显式模式切换（与「输入即转换」及匹配指令携载进入的形态一致）。</li>
+            <li><b>历史记录入口（PRD 4.7.1）</b>：工具页头部「历史」下拉面板——点击记录回填输入、单条 ✕ 删除、面板底部「清空本工具」；主界面「最近使用」标题右侧提供「清空全部历史」（二次确认）。原型待补，实现以 PRD v0.3 为准。</li>
+            <li><b>JSON 定位</b>：页面内自写校验器方案定稿为正式实现方案（技术设计 §11.5 v0.2），不依赖 V8 报错文案，配套单测覆盖行列正确性。</li>
+            <li><b>画布语义</b>：544 = 插件应用自身高度（<code>pluginSetting.height</code>），不含主输入框，页面按 800 × 544 设计，定稿。</li>
+          </ul>
+        </section>
 
-    <div class="hub-panel">
-      <h4>NOT COVERED · 未单独出原型的页面</h4>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7">
-        UUID 生成 / 进制转换 / URL 编解码与「时间戳转换」同属<b>标准工具页范式</b>（输入 + 定义行输出 + 分段模式），实现阶段直接复用该范式，不再重复出原型。P1 工具页面在对应开发阶段补充。
+        <section>
+          <h3>画布与主输入栏</h3>
+          <ul>
+            <li>页面按 <b>800 × 544</b> 设计。官方文档中 <code>pluginSetting.height</code> 默认值 544、<code>setExpandHeight</code> 的说明是「设置插件应用在主窗口中的高度」，所以 544 是插件应用自身的高度，不含上方的主输入框。旧原型把 544 当成了含输入栏的总高，页面实际只按 500 设计。</li>
+            <li>主界面调用 <code>setSubInput(onChange, placeholder, isFocus)</code> 后，uTools 主输入框就是搜索框，页面内不再放第二个搜索框。上方主输入栏的结构参照官方文档的效果图。</li>
+            <li>进入工具页后 <code>removeSubInput()</code>，主输入栏交还 uTools，所以工具页上方显示为不可输入。</li>
+            <li>子输入框里的回车、方向键能否被插件接收到，仍是技术设计里的风险项 T1，这里演示的是期望行为。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>相对旧原型的改动</h3>
+          <ul>
+            <li>图标全部换成同一套单线 SVG（24 网格、统一描边），不再使用 emoji 和文字徽标。</li>
+            <li>主界面改为「左标签列 + 内容列」：收藏、最近使用各占一行，13 个工具两列排布，800 × 544 内一屏可见，无需滚动。</li>
+            <li>工具页去掉卡片套卡片：一个输入框加一个结果面板，结果用「键 | 值」行承载。</li>
+            <li>时间戳页取消模式切换：输入时间戳或日期自动识别方向，并同时给出秒、毫秒、本地、UTC、ISO 与相对时间。</li>
+            <li>JSON 页补上了 PRD 4.3.4 要求的节点折叠，输出格式用一组分段控件切换（2 空格 / 4 空格 / Tab / 压缩）。</li>
+            <li>外观设置按 PRD 4.7.3 提供「跟随系统 / 亮色 / 暗色」三选项，入口在主界面右上角。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>设计 token（与 §9.1 v0.2 已同步，此处保留调整依据）</h3>
+          <ul>
+            <li><code>--muted</code> 由 <code>#6a737d</code> 调深为 <code>#5d6772</code>：原值在浅灰和选中底色上只有 4.2–4.4:1。</li>
+            <li><code>--danger</code> 文字色由 <code>#e5484d</code> 调为 <code>#ba2126</code>：原值在白底上只有 3.9:1；原值保留为 <code>--danger-fill</code>。</li>
+            <li>新增 <code>--accent-text</code>（<code>#0b5fd0</code>）：品牌蓝 <code>#1e80ff</code> 做文字只有 3.76:1，只用于焦点环和选中指示条。</li>
+            <li>新增 <code>--border-control</code>：输入框边框对白底达到 3:1（WCAG 1.4.11）。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>原型里的演示数据</h3>
+          <ul>
+            <li>「我的收藏」「最近使用」的初始内容和时间均为演示数据；在原型里打开某个工具页，会把它记入最近使用。</li>
+            <li>农历由运行环境内置的中文历法算出，是真实结果；正式版按技术设计 §11.2 内置查表算法。</li>
+            <li>JSON 的行号、列号由页面内自写的校验器给出：当前 Chromium 对部分语法错误不再在报错文案里附带位置。</li>
+          </ul>
+        </section>
       </div>
-    </div>
+    </details>
   </div>
 
-  <div class="stage">
-    <div class="uwindow">
-      <div class="usearch">
-        <span class="upill"><span class="ulogo"></span>搜索工具…（uTools 子输入框 · 原型中以页面内搜索框模拟）</span>
-        <button class="icon-btn" data-action="toggle-theme" title="切换主题">🌙</button>
-      </div>
-      <iframe id="frame" src="home.html"></iframe>
-    </div>
-    <div class="stage-note">
-      <span>WINDOW 800 × 544（uTools BrowserView）</span>
-      <span>按 1–5 快速切换页面</span>
-      <span>主题切换同步所有页面</span>
-      <span>工具卡片可点击跳转</span>
-    </div>
-  </div>
 </div>
 
-<script src="assets/proto.js"></script>
 <script>
-  const frame = document.getElementById('frame')
-  const pages = ['home', 'tool-timestamp', 'tool-base64', 'tool-json', 'tool-date-calc']
-  let cur = 'home'
+(function () {
+  'use strict'
+  const proto = window.proto
+  const { esc, icon, store } = proto
+  const $ = (id) => document.getElementById(id)
 
-  function go(page) {
-    cur = page
-    frame.src = page + '.html'
-    document.querySelectorAll('.page-item').forEach(el =>
-      el.classList.toggle('active', el.dataset.page === page))
+  const PAGES = [
+    { id: 'home', name: '主界面', icon: 'grid', desc: '分类 · 搜索过滤 · 收藏 · 最近使用', tag: '开发工具箱',
+      states: [['', '默认'], ['fresh', '首次使用'], ['noresult', '搜索无结果']] },
+    { id: 'tool-timestamp', name: '时间戳转换', icon: 'clock', desc: '标准工具页范式 · 真实转换', tag: '时间戳',
+      states: [['', '输入时间戳'], ['date', '输入日期'], ['error', '超范围'], ['micro', '16 位微秒'], ['empty', '空态']] },
+    { id: 'tool-base64', name: 'Base64 编解码', icon: 'base64', desc: '自动识别方向 · 真实编解码', tag: 'base64',
+      states: [['', '编码'], ['decode', '解码'], ['error', '非法字符'], ['empty', '空态']] },
+    { id: 'tool-json', name: 'JSON 格式化', icon: 'json', desc: '高亮 · 错误定位 · 节点折叠', tag: 'json',
+      states: [['', '默认'], ['error', '语法错误'], ['empty', '空态']] },
+    { id: 'tool-date-calc', name: '日期换算', icon: 'calendar', desc: '信息面板范式 · 农历为真实数据', tag: '日期换算',
+      states: [['', '默认'], ['error', '无效日期'], ['empty', '空态']] },
+  ]
+
+  const CHECKLIST = [
+    '800 × 544 内无横向溢出，主界面一屏可见全部工具',
+    '输入即转换，没有「转换」按钮（PRD 4.2-1）',
+    '每个结果可独立复制，并有「已复制」轻提示（PRD 4.2-2）',
+    '非法输入行内报错并说明原因，不白屏（PRD 4.2-4）',
+    '空态有用法示例引导（PRD 4.2-5）',
+    '时间戳 10 位与 13 位输出同一时刻（PRD 4.3.1）',
+    '暗色模式下正文对比度 ≥ 4.5:1（PRD 4.7.3）',
+    '图标为统一风格的 SVG，没有 emoji 和文字徽标',
+  ]
+
+  const frame = $('frame')
+  const pageList = $('pageList')
+  const stateChips = $('stateChips')
+  const utag = $('utag')
+  const uinput = $('uinput')
+  const stageFit = $('stageFit')
+
+  let cur = 'home'
+  let curState = ''
+
+  /* ---------- 页面列表与状态预览 ---------- */
+
+  function renderPages() {
+    pageList.innerHTML = PAGES.map((p, i) =>
+      `<li><button type="button" class="page-item" data-page="${p.id}" aria-current="${p.id === cur ? 'page' : 'false'}">` +
+      `${icon(p.icon)}<span class="pi-text"><span class="pi-name">${esc(p.name)}</span><span class="pi-desc">${esc(p.desc)}</span></span>` +
+      `<kbd class="kbd">${i + 1}</kbd></button></li>`).join('')
   }
 
-  document.querySelectorAll('.page-item').forEach(el => {
-    el.addEventListener('click', () => go(el.dataset.page))
+  function renderStates() {
+    const p = PAGES.find((x) => x.id === cur)
+    stateChips.innerHTML = p.states.map(([id, name]) =>
+      `<button type="button" class="state-chip" data-state="${id}" aria-pressed="${id === curState}">${esc(name)}</button>`).join('')
+  }
+
+  function go(id, state) {
+    const p = PAGES.find((x) => x.id === id)
+    if (!p) return
+    cur = id
+    curState = state || ''
+    const q = new URLSearchParams()
+    if (curState === 'noresult') q.set('q', 'zzz')
+    else if (curState) q.set('demo', curState)
+    frame.src = p.id + '.html' + (q.toString() ? '?' + q.toString() : '')
+
+    utag.textContent = p.tag
+    const isHome = id === 'home'
+    uinput.disabled = !isHome
+    uinput.value = curState === 'noresult' ? 'zzz' : ''
+    uinput.placeholder = isHome ? '搜索工具…' : '工具页不接管主输入框，已交还 uTools'
+    renderPages()
+    renderStates()
+  }
+
+  pageList.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-page]')
+    if (b) go(b.dataset.page)
   })
 
-  document.addEventListener('keydown', (ev) => {
-    const idx = Number(ev.key) - 1
-    if (idx >= 0 && idx < pages.length) go(pages[idx])
+  stateChips.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-state]')
+    if (b) go(cur, b.dataset.state)
   })
 
-  // 工具页内点击卡片 → 切换 iframe 页面
+  // 数字键 1–5 切换页面；在输入框里打字时不触发
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const t = e.target
+    if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return
+    const idx = Number(e.key) - 1
+    if (Number.isInteger(idx) && idx >= 0 && idx < PAGES.length) go(PAGES[idx].id)
+  })
+
+  /* ---------- 主输入框：模拟 setSubInput(onChange) ---------- */
+
+  const post = (msg) => frame.contentWindow.postMessage(msg, '*')
+
+  uinput.addEventListener('input', () => post({ type: 'proto:filter', text: uinput.value }))
+
+  uinput.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); post({ type: 'proto:focus-list' }) }
+    else if (e.key === 'Enter') { e.preventDefault(); post({ type: 'proto:enter' }) }
+  })
+
+  /* ---------- 接收原型页面发来的消息 ---------- */
+
   window.addEventListener('message', (ev) => {
     const d = ev.data || {}
-    if (d.type === 'proto-nav' && pages.includes(d.page)) go(d.page)
-    if (d.type === 'proto-theme') {
-      // 子页切换主题时同步记住
-      try { localStorage.setItem('proto-theme', d.theme) } catch (e) {}
-    }
+    if (d.type === 'proto:nav' && PAGES.some((p) => p.id === d.page)) go(d.page)
+    else if (d.type === 'proto:theme') proto.setTheme(d.mode, false)
+    else if (d.type === 'proto:set-input') { uinput.value = d.text; uinput.setSelectionRange(uinput.value.length, uinput.value.length) }
+    else if (d.type === 'proto:focus-input') uinput.focus()
   })
 
-  // 审阅台切换主题 → 同步给 iframe
-  document.addEventListener('click', (ev) => {
-    if (ev.target.closest('[data-action="toggle-theme"]')) {
-      frame.contentWindow.postMessage(
-        { type: 'proto-theme', theme: document.documentElement.dataset.theme }, '*')
-    }
-  })
-
-  // iframe 每次加载完成后推送当前主题（保证切换页面时主题一致）
+  // 页面每次加载完成后同步一次外观，保证切换页面时主题一致
   frame.addEventListener('load', () => {
-    frame.contentWindow.postMessage(
-      { type: 'proto-theme', theme: document.documentElement.dataset.theme }, '*')
+    post({ type: 'proto:theme', mode: proto.themeMode() })
+    fit()
   })
+
+  // 审阅台这边切换外观（顶栏控件，或系统主题变化）时同步给当前页面
+  document.addEventListener('proto:theme', () => post({ type: 'proto:theme', mode: proto.themeMode() }))
+
+  /* ---------- 评审要点：进度记在本机 ---------- */
+
+  const CHECK_KEY = 'proto.checklist'
+  function renderChecklist() {
+    let saved = []
+    try { saved = JSON.parse(store.getItem(CHECK_KEY)) || [] } catch (e) { /* 首次打开 */ }
+    $('checklist').innerHTML = CHECKLIST.map((text, i) =>
+      `<li><label><input type="checkbox" data-check="${i}"${saved[i] ? ' checked' : ''}><span>${esc(text)}</span></label></li>`).join('')
+  }
+
+  $('checklist').addEventListener('change', () => {
+    const saved = Array.from(document.querySelectorAll('[data-check]')).map((c) => c.checked)
+    store.setItem(CHECK_KEY, JSON.stringify(saved))
+  })
+
+  /* ---------- 窄窗口时等比缩小舞台 ---------- */
+
+  function fit() {
+    const avail = stageFit.parentElement.clientWidth
+    const scale = Math.min(1, avail / 800)
+    stageFit.style.transform = scale < 1 ? `scale(${scale})` : ''
+    stageFit.style.height = scale < 1 ? Math.round((544 + 53) * scale) + 'px' : ''
+  }
+
+  window.addEventListener('resize', fit)
+
+  /* ---------- 初始 ---------- */
+
+  document.addEventListener('proto:ready', () => {
+    renderChecklist()
+    go('home')
+    fit()
+  })
+})()
 </script>
 </body>
 </html>

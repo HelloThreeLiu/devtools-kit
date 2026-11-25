@@ -1,162 +1,293 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-zcode-design>
 <head>
 <meta charset="utf-8">
-<title>原型 · 日期换算</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevTools Kit · 日期换算</title>
 <link rel="stylesheet" href="assets/proto.css">
+<script src="assets/proto.js"></script>
 </head>
 <body>
 <div class="app">
 
-  <div class="tool-header">
-    <button class="back-btn" data-nav="home">← 返回</button>
-    <span class="chip accent">DC</span>
-    <span class="title">日期换算</span>
-    <span class="kw">datecalc · lunar · date-diff</span>
-    <span class="spacer"></span>
-    <button class="star" title="收藏">☆</button>
-    <button class="icon-btn" data-action="toggle-theme">🌙</button>
-  </div>
+  <header class="topbar" id="shell-header" data-tool="date-calc"></header>
 
-  <div class="content">
+  <div class="tool-body">
 
     <!-- 单日查询 -->
-    <div class="card">
-      <div class="label">查询日期（支持 YYYY-MM-DD / YYYY/MM/DD / YYYY年M月D日）</div>
-      <div style="display:flex;gap:8px">
-        <input class="input" id="dateInput" value="2025-01-29" spellcheck="false">
-        <button class="btn" id="btnToday">今天</button>
+    <div class="block">
+      <div class="block-head">
+        <label for="dateInput">日期</label>
+        <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" id="btnToday">填入今天</button>
       </div>
-      <div class="err" id="err"></div>
+      <div class="input-wrap">
+        <input class="input" id="dateInput" placeholder="如 2025-01-29、2025/01/29 或 2025年1月29日" autocomplete="off" spellcheck="false" aria-describedby="err">
+        <span class="input-affix" id="affix" aria-hidden="true" hidden></span>
+        <button type="button" class="input-clear" id="btnClear" aria-label="清空" title="清空" hidden>
+          <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="alert" id="err" role="alert" hidden></div>
     </div>
 
-    <div class="info-grid" style="margin-top:10px">
-      <div class="info-cell">
-        <div class="k">农历 <span class="tag">演示数据</span></div>
-        <div class="v" id="oLunar">乙巳年 正月初一</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px">蛇年 · 无闰月</div>
-      </div>
-      <div class="info-cell">
-        <div class="k">星期</div>
-        <div class="v" id="oWeek">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px" id="oIsoWeek">ISO 周 —</div>
-      </div>
-      <div class="info-cell">
-        <div class="k">年内序数</div>
-        <div class="v" id="oDoy">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px" id="oYearType">—</div>
-      </div>
-      <div class="info-cell">
-        <div class="k">距今天数</div>
-        <div class="v" id="oDiffToday">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px" id="oFuture">—</div>
-      </div>
-    </div>
+    <div class="panel" id="panel"></div>
 
     <!-- 日期差 -->
-    <div class="card" style="margin-top:12px">
-      <div class="label">日期差计算（自然日，跨时区安全取 UTC 12:00）</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input class="input" id="d1" value="2025-01-01" spellcheck="false">
-        <span style="color:var(--muted)">→</span>
-        <input class="input" id="d2" value="2025-03-01" spellcheck="false">
-        <span style="font-family:var(--mono);font-size:13px;font-weight:700" id="diffOut">—</span>
+    <div class="block">
+      <div class="block-head">
+        <span class="block-title" id="diffLabel">日期差</span>
+        <span>按自然日计算</span>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--muted)" id="diffNote">排除周六日的工作日数将在 P1 阶段支持</div>
+      <div class="field-row diff-row" role="group" aria-labelledby="diffLabel">
+        <div class="input-wrap">
+          <input class="input" id="d1" aria-label="开始日期" value="2025-01-01" autocomplete="off" spellcheck="false">
+        </div>
+        <svg class="icon diff-arrow" aria-hidden="true" focusable="false"><use href="#i-arrow-right"></use></svg>
+        <div class="input-wrap">
+          <input class="input" id="d2" aria-label="结束日期" value="2025-03-01" autocomplete="off" spellcheck="false">
+        </div>
+        <span class="diff-result">
+          <code id="diffOut">—</code><span class="aside">天</span>
+          <button type="button" class="icon-btn" id="btnCopyDiff" title="复制相差天数" aria-label="复制相差天数">
+            <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-copy"></use></svg>
+          </button>
+        </span>
+      </div>
+      <div class="diff-note" id="diffNote"></div>
+      <div class="alert" id="diffErr" role="alert" hidden></div>
     </div>
 
-    <details class="notes">
-      <summary>DESIGN NOTES · 设计说明（对应 PRD 4.4.1）</summary>
-      <ul>
-        <li>农历卡片当前为<b>演示数据</b>：正式版接入 1900–2100 查表算法，单测对拍 20 个抽查日期（验收标准）</li>
-        <li>星期 / 年内序数 / ISO 周 / 日期差为真实计算，可直接验收</li>
-        <li>日期差取 <code>UTC 12:00</code> 计算，规避夏令时 ±1 天误差（§11.2）</li>
-        <li>「今天」一键填入当前日期（功能要求）</li>
-        <li>非法日期（如 2025-02-30）行内报错，不做自动进位（PRD 4.2-4）</li>
-      </ul>
-    </details>
   </div>
+
+  <footer class="statusbar">
+    <span class="hint"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Enter</kbd> 复制农历</span>
+    <span class="grow"></span>
+    <span>农历支持 1900–2100 年</span>
+  </footer>
+
 </div>
 
-<script src="assets/proto.js"></script>
 <script>
+(function () {
+  'use strict'
+  const proto = window.proto
+  const { esc, icon, WEEKDAYS, fmtDate } = proto
   const $ = (id) => document.getElementById(id)
 
-  function parseYMD(str) {
+  const input = $('dateInput')
+  const affix = $('affix')
+  const clearBtn = $('btnClear')
+  const alertEl = $('err')
+  const panel = $('panel')
+  const d1 = $('d1')
+  const d2 = $('d2')
+  const diffOut = $('diffOut')
+  const diffNote = $('diffNote')
+  const diffErr = $('diffErr')
+
+  const MIN_YEAR = 1900
+  const MAX_YEAR = 2100 // 农历查表算法覆盖范围（技术设计 §11.2）
+
+  const LABELS = { date: '日期', lunar: '农历', ordinal: '年内序数', until: '距今天数' }
+  const values = {}
+  let mainValue = ''
+  let diffValue = ''
+
+  const copyBtn = (key) =>
+    `<button type="button" class="icon-btn" data-copy-key="${key}" title="复制${LABELS[key]}" aria-label="复制${LABELS[key]}">${icon('copy', 'icon icon--sm')}</button>`
+
+  /* ---------- 日期工具 ---------- */
+
+  const dayDiff = (a, b) => Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate(), 12) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate(), 12)) / 86400000) // 取 UTC 正午，规避夏令时 ±1 天
+
+  // 支持 YYYY-MM-DD、YYYY/MM/DD、YYYY年M月D日；逐项比对，2 月 30 日这类不做进位
+  function parseDate(str) {
     const m = str.trim().match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})日?$/)
     if (!m) return null
-    const [, y, mo, d] = m.map(Number)
-    const date = new Date(y, mo - 1, d)
-    if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null
-    return date
+    const [y, mo, d] = m.slice(1).map(Number)
+    const date = new Date(0)
+    date.setFullYear(y, mo - 1, d)
+    date.setHours(0, 0, 0, 0)
+    return date.getFullYear() === y && date.getMonth() === mo - 1 && date.getDate() === d ? date : null
   }
 
-  /* ISO 8601 周数（周四所在周为第 1 周） */
+  function dateError(str) {
+    const m = str.trim().match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/)
+    if (!m) return { message: `无法识别「${str.trim()}」：请写成 2025-01-29、2025/01/29 或 2025年1月29日。` }
+    const [, y, mo, d] = m
+    const year = Number(y)
+    if (year < MIN_YEAR || year > MAX_YEAR) return { message: `${year} 年超出支持范围（${MIN_YEAR}–${MAX_YEAR} 年）。` }
+    if (Number(mo) < 1 || Number(mo) > 12) return { message: `月份须在 1–12 之间，收到 ${mo}。` }
+    const days = new Date(year, Number(mo), 0).getDate()
+    if (Number(d) > days) return { message: `${y} 年 ${mo} 月只有 ${days} 天，没有 ${d} 日。` }
+    return { message: '日期无效。' }
+  }
+
+  // ISO 8601 周：含首个周四的那一周为第 1 周
   function isoWeek(d) {
-    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-    const dayNum = t.getUTCDay() || 7
-    t.setUTCDate(t.getUTCDate() + 4 - dayNum)
-    const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1))
-    return Math.ceil(((t - yearStart) / 86400000 + 1) / 7)
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+    const dayNum = (date.getUTCDay() + 6) % 7 // 周一 = 0
+    date.setUTCDate(date.getUTCDate() - dayNum + 3) // 本周的周四
+    const firstThursday = date.getTime()
+    date.setUTCMonth(0, 1)
+    if (date.getUTCDay() !== 4) date.setUTCMonth(0, 1 + ((4 - date.getUTCDay()) + 7) % 7)
+    return { year: date.getUTCFullYear(), week: 1 + Math.ceil((firstThursday - date.getTime()) / 604800000) }
   }
 
-  /* 日期差（UTC 正午，规避 DST） */
-  function diffDays(a, b) {
-    const ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate(), 12)
-    const ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate(), 12)
-    return Math.round((ub - ua) / 86400000)
+  const dayOfYear = (d) => Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(d.getFullYear(), 0, 1)) / 86400000) + 1
+  const isLeap = (y) => new Date(y, 1, 29).getMonth() === 1
+
+  /* ---------- 农历 ----------
+     原型用运行环境内置的中文历法（Intl chinese calendar）给出真实结果；
+     正式版按技术设计 §11.2 内置 1900–2100 查表算法，二者结果应一致 */
+
+  const DAY_NAMES = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+    '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+    '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十']
+  const BRANCHES = '子丑寅卯辰巳午未申酉戌亥'
+  const ZODIAC = '鼠牛虎兔龙蛇马羊猴鸡狗猪'
+
+  function lunar(date) {
+    const parts = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { year: 'numeric', month: 'long', day: 'numeric' }).formatToParts(date)
+    const get = (type) => { const p = parts.find((x) => x.type === type); return p ? p.value : '' }
+    const yearName = get('yearName') // 天干地支，如「乙巳」
+    const month = get('month') // 如「正月」「闰二月」
+    const day = Number(get('day')) // 1–30
+    if (!yearName || !month || !(day >= 1 && day <= 30)) throw new Error('lunar unavailable')
+    return {
+      text: `${yearName}年 ${month}${DAY_NAMES[day - 1]}`,
+      zodiac: ZODIAC[BRANCHES.indexOf(yearName[1])] || '',
+    }
+  }
+
+  /* ---------- 单日查询 ---------- */
+
+  const kv = (k, v, key, aside) =>
+    `<div class="kv"><span class="k">${k}</span><span class="v">${v}${aside ? `<span class="aside">${aside}</span>` : ''}</span>${copyBtn(key)}</div>`
+
+  function resultHTML(d) {
+    const y = d.getFullYear()
+    const iso = isoWeek(d)
+    const lu = lunar(d)
+    const ord = dayOfYear(d)
+    const gap = dayDiff(new Date(), d)
+    const until = gap === 0 ? '今天' : gap > 0 ? `${gap} 天后` : `${-gap} 天前`
+
+    values.date = fmtDate(d)
+    values.weekday = WEEKDAYS[d.getDay()]
+    values.lunar = lu.text + (lu.zodiac ? `（${lu.zodiac}年）` : '')
+    values.ordinal = `第 ${ord} 天 · ISO 第 ${iso.week} 周`
+    values.until = until
+    mainValue = values.lunar
+
+    return '<div class="panel-head"><span>日期信息</span><span class="grow"></span>' +
+      `<button type="button" class="btn btn--ghost" data-copy-key="date" title="复制日期">${icon('copy', 'icon icon--sm')}复制</button></div>` +
+      `<div class="panel-hero"><code>${values.date}</code><span class="aside">${values.weekday}</span></div>` +
+      '<div class="kvs">' +
+      kv('农历', lu.text, 'lunar', lu.zodiac ? `${lu.zodiac}年` : '') +
+      kv('年内序数', `第 ${ord} 天`, 'ordinal', `${iso.year !== y ? iso.year + ' 年 ' : ''}ISO 第 ${iso.week} 周 · ${isLeap(y) ? '闰年' : '平年'}`) +
+      kv('距今', until, 'until') +
+      '</div>'
+  }
+
+  function emptyHTML() {
+    mainValue = ''
+    return '<div class="panel-head"><span>日期信息</span></div>' +
+      '<div class="panel-empty">输入一个日期，查看农历、星期、年内序数和距今天数。' +
+      '<div class="examples">' +
+      ['2025-01-29', '2024-01-01', '2023-03-22'].map((x) => `<button type="button" class="example" data-fill="${x}">${x}</button>`).join('') +
+      '</div></div>'
   }
 
   function run() {
-    const d = parseYMD($('dateInput').value)
-    if (!d) {
-      const el = $('err')
-      el.textContent = '✋ 无法解析日期，请使用 YYYY-MM-DD 格式，且日期必须真实存在'
-      el.classList.add('show')
+    const raw = input.value.trim()
+    clearBtn.hidden = !raw
+    if (!raw) {
+      proto.clearError(alertEl, input)
+      affix.hidden = true
+      panel.innerHTML = emptyHTML()
       return
     }
-    $('err').classList.remove('show')
-
-    $('oWeek').textContent = protoWeek(d)
-    $('oIsoWeek').textContent = `ISO 第 ${isoWeek(d)} 周`
-
-    const start = new Date(d.getFullYear(), 0, 1)
-    const doy = diffDays(start, d) + 1
-    $('oDoy').textContent = `第 ${doy} 天`
-    const leap = (d.getFullYear() % 4 === 0 && d.getFullYear() % 100 !== 0) || d.getFullYear() % 400 === 0
-    $('oYearType').textContent = `${d.getFullYear()} 年${leap ? ' · 闰年（366 天）' : ' · 平年（365 天）'}`
-
-    const today = new Date()
-    const gap = diffDays(d, today)
-    $('oDiffToday').textContent = `${gap} 天`
-    $('oFuture').textContent = gap > 0 ? `${gap} 天前` : gap < 0 ? `${-gap} 天后` : '就是今天'
-
-    // 农历：演示数据（正式版接入查表算法）
-    $('oLunar').textContent = '乙巳年 正月初一（演示）'
+    const date = parseDate(raw)
+    // 农历查表算法只覆盖 1900–2100 年（技术设计 §11.2），范围外同样按无效日期处理
+    if (!date || date.getFullYear() < MIN_YEAR || date.getFullYear() > MAX_YEAR) {
+      proto.setError(alertEl, input, dateError(raw))
+      affix.hidden = true
+      panel.innerHTML = emptyHTML()
+      return
+    }
+    proto.clearError(alertEl, input)
+    affix.hidden = false
+    affix.innerHTML = icon('check') + fmtDate(date)
+    try {
+      panel.innerHTML = resultHTML(date)
+    } catch (e) {
+      proto.setError(alertEl, input, { message: '当前环境不支持中文历法，无法换算农历。' })
+      panel.innerHTML = emptyHTML()
+    }
   }
 
-  function runDiff() {
-    const a = parseYMD($('d1').value)
-    const b = parseYMD($('d2').value)
-    if (!a || !b) { $('diffOut').textContent = '格式错误'; return }
-    const n = diffDays(a, b)
-    $('diffOut').textContent = `${n} 天`
-    $('diffNote').textContent = `${protoFmt(a).slice(0, 10)} → ${protoFmt(b).slice(0, 10)} · 自然日 ${Math.abs(n)} 天（${n >= 0 ? '向后' : '向前'}）`
-  }
-
-  $('dateInput').addEventListener('input', run)
-  $('d1').addEventListener('input', runDiff)
-  $('d2').addEventListener('input', runDiff)
-
-  $('btnToday').addEventListener('click', () => {
-    const n = new Date()
-    const p = (x) => String(x).padStart(2, '0')
-    $('dateInput').value = `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`
+  function setInput(v) {
+    input.value = v
     run()
+    input.focus() // 焦点留在输入框，粘贴与快捷键不中断
+    input.setSelectionRange(v.length, v.length)
+  }
+
+  input.addEventListener('input', run)
+  clearBtn.addEventListener('click', () => setInput(''))
+  $('btnToday').addEventListener('click', () => setInput(fmtDate(new Date())))
+  panel.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-copy-key]')
+    if (c) { protoCopy(values[c.dataset.copyKey], LABELS[c.dataset.copyKey]); return }
+    const f = e.target.closest('[data-fill]')
+    if (f) setInput(f.dataset.fill)
   })
 
-  run()
-  runDiff()
+  /* ---------- 日期差 ---------- */
+
+  function runDiff() {
+    const a = parseDate(d1.value)
+    const b = parseDate(d2.value)
+    diffValue = ''
+    if (!a || !b) {
+      const bad = !a ? d1 : d2
+      proto.setError(diffErr, bad, dateError(bad.value || ''))
+      diffOut.textContent = '—'
+      diffNote.textContent = ''
+      return
+    }
+    proto.clearError(diffErr)
+    const n = dayDiff(a, b)
+    diffValue = String(Math.abs(n))
+    diffOut.textContent = diffValue
+    diffNote.textContent = n < 0
+      ? '结束日期早于开始日期，已按绝对值计算。'
+      : `不含起始日；首尾两天都算上是 ${Math.abs(n) + 1} 天。`
+  }
+
+  d1.addEventListener('input', runDiff)
+  d2.addEventListener('input', runDiff)
+  $('btnCopyDiff').addEventListener('click', () => protoCopy(diffValue, '相差天数'))
+
+  /* ---------- Ctrl+Enter 复制农历 ---------- */
+
+  window.protoMainCopy = () => protoCopy(mainValue, LABELS.lunar)
+
+  /* ---------- 初始 ---------- */
+
+  document.addEventListener('proto:ready', () => {
+    const demo = new URLSearchParams(location.search).get('demo') || ''
+    if (demo === 'empty') input.value = ''
+    else if (demo === 'error') input.value = '2025-02-30'
+    else input.value = '2025-01-29'
+    run()
+    runDiff()
+    input.focus() // 呼起即聚焦，Ctrl+V 直接粘贴（PRD 4.2-3）
+    input.select()
+  })
+})()
 </script>
 </body>
 </html>

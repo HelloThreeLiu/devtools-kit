@@ -1,220 +1,317 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-zcode-design>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>原型 · 主界面</title>
+<title>DevTools Kit · 主界面</title>
 <link rel="stylesheet" href="assets/proto.css">
-<style>
-  .hint-bar {
-    margin-top: 16px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-    font-family: var(--mono);
-    font-size: 10.5px;
-    color: var(--muted);
-    display: flex;
-    gap: 16px;
-  }
-  .empty {
-    display: none;
-    padding: 28px 0;
-    text-align: center;
-    color: var(--muted);
-    font-size: 12px;
-  }
-</style>
+<script src="assets/proto.js"></script>
 </head>
 <body>
 <div class="app">
 
-  <!-- 顶栏：品牌 / 搜索（模拟 uTools 子输入框）/ 实时时间戳 / 主题 -->
-  <div class="topbar">
-    <div class="brand"><span class="mark"></span>devtools-kit</div>
-    <div class="search">
-      <span>⌕</span>
-      <input id="filter" placeholder="搜索工具…（uTools 子输入框接管）" autocomplete="off">
-      <span class="kbd">↵</span>
-    </div>
-    <div class="live-clock">
-      <span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite"></span>
-      <span class="ts" id="clockTs">—</span>
-      <span id="clockTime">—</span>
-    </div>
-    <button class="icon-btn" data-action="toggle-theme">🌙</button>
-  </div>
+  <main class="home">
+    <h1 class="sr-only">DevTools Kit 开发工具箱</h1>
 
-  <div class="with-rail">
-    <!-- 左侧分类栏 -->
-    <div class="rail" id="rail">
-      <div class="rail-item active" data-cat="all">全部 <span class="cnt">13</span></div>
-      <div class="rail-item" data-cat="codec">编解码 <span class="cnt">7</span></div>
-      <div class="rail-item" data-cat="datetime">时间日期 <span class="cnt">1</span></div>
-      <div class="rail-item" data-cat="text">文本生成 <span class="cnt">4</span></div>
-      <div class="rail-item" data-cat="design">设计辅助 <span class="cnt">1</span></div>
-    </div>
-
-    <!-- 内容区 -->
-    <div class="content">
-      <div class="section-label">FAVORITES <span class="zh">我的收藏</span></div>
-      <div class="fav-row">
-        <div class="fav-pill" data-nav="tool-timestamp"><span class="chip accent">TS</span>时间戳转换</div>
-        <div class="fav-pill" data-nav="tool-json"><span class="chip accent">JSON</span>JSON 格式化</div>
-        <div class="fav-pill" data-nav="tool-base64"><span class="chip accent">B64</span>Base64 编解码</div>
-      </div>
-
-      <div class="section-label">RECENT <span class="zh">最近使用</span></div>
-      <div class="recent-row" id="recentRow">
-        <div class="recent-item" data-nav="tool-date-calc"><span class="chip">DC</span>日期换算 <span class="ago"></span></div>
-        <div class="recent-item"><span class="chip">HEX</span>进制转换 <span class="ago" data-min="60"></span></div>
-        <div class="recent-item"><span class="chip">UUID</span>UUID 生成 <span class="ago" data-min="185"></span></div>
-      </div>
-
-      <div class="section-label">ALL TOOLS <span class="zh">全部工具</span></div>
-      <div class="tool-grid" id="toolGrid">
-        <div class="tool-card" data-nav="tool-timestamp" data-cat="codec" data-kw="时间戳 timestamp 毫秒 unix ts">
-          <div class="row1"><span class="chip">TS</span><span class="name">时间戳转换</span>
-            <button class="star fav" title="收藏">★</button></div>
-          <div class="desc">秒/毫秒时间戳与日期双向转换</div>
-          <div class="kw">timestamp · unix</div>
-        </div>
-        <div class="tool-card" data-nav="tool-date-calc" data-cat="datetime" data-kw="日期换算 农历 星期 天数差 datecalc dc">
-          <div class="row1"><span class="chip">DC</span><span class="name">日期换算</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">农历、星期、年内序数、日期差</div>
-          <div class="kw">datecalc · lunar</div>
-        </div>
-        <div class="tool-card" data-nav="tool-base64" data-cat="codec" data-kw="base64 编码 解码 b64">
-          <div class="row1"><span class="chip">B64</span><span class="name">Base64 编解码</span>
-            <button class="star fav" title="收藏">★</button></div>
-          <div class="desc">文本与 Base64 双向转换，自动识别</div>
-          <div class="kw">base64 · encode</div>
-        </div>
-        <div class="tool-card" data-nav="tool-json" data-cat="codec" data-kw="json 格式化 校验 压缩">
-          <div class="row1"><span class="chip">JSON</span><span class="name">JSON 格式化</span>
-            <button class="star fav" title="收藏">★</button></div>
-          <div class="desc">格式化、压缩、校验并定位语法错误</div>
-          <div class="kw">json · format</div>
-        </div>
-        <div class="tool-card" data-cat="codec" data-kw="url 编码 解码 参数 uri">
-          <div class="row1"><span class="chip">URL</span><span class="name">URL 编解码</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">URL 编解码与查询参数结构化解析</div>
-          <div class="kw">url · uri</div>
-        </div>
-        <div class="tool-card" data-cat="codec" data-kw="进制 转换 hex 二进制 radix">
-          <div class="row1"><span class="chip">HEX</span><span class="name">进制转换</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">2/8/10/16 进制互转，大数安全</div>
-          <div class="kw">radix · hex</div>
-        </div>
-        <div class="tool-card" data-cat="text" data-kw="uuid guid 标识 生成">
-          <div class="row1"><span class="chip">UUID</span><span class="name">UUID 生成</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">UUID v4 批量生成，多种格式</div>
-          <div class="kw">uuid · v4</div>
-        </div>
-        <div class="tool-card" data-cat="codec" data-kw="哈希 md5 sha 摘要 hash">
-          <div class="row1"><span class="chip">HASH</span><span class="name">哈希计算</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">MD5 / SHA-1 / SHA-256 / SHA-512 <span class="tag" style="margin-left:4px">P1</span></div>
-          <div class="kw">hash · md5 · sha</div>
-        </div>
-        <div class="tool-card" data-cat="codec" data-kw="unicode 中文 转义 u4f60">
-          <div class="row1"><span class="chip">UNI</span><span class="name">Unicode 转中文</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">\uXXXX 转义与中文互转 <span class="tag" style="margin-left:4px">P1</span></div>
-          <div class="kw">unicode · \\u</div>
-        </div>
-        <div class="tool-card" data-cat="text" data-kw="二维码 扫码 qrcode">
-          <div class="row1"><span class="chip">QR</span><span class="name">二维码生成</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">文本转二维码，本地生成可复制 <span class="tag" style="margin-left:4px">P1</span></div>
-          <div class="kw">qrcode</div>
-        </div>
-        <div class="tool-card" data-cat="text" data-kw="命名 驼峰 下划线 转换 case">
-          <div class="row1"><span class="chip">CASE</span><span class="name">命名风格转换</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">camel / snake / kebab 五种互转 <span class="tag" style="margin-left:4px">P1</span></div>
-          <div class="kw">camelCase · snake_case</div>
-        </div>
-        <div class="tool-card" data-cat="text" data-kw="文本 统计 字数 行数 stat">
-          <div class="row1"><span class="chip">STAT</span><span class="name">文本统计</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">字数、行数、UTF-8 字节数统计 <span class="tag" style="margin-left:4px">P1</span></div>
-          <div class="kw">count · utf8</div>
-        </div>
-        <div class="tool-card" data-cat="design" data-kw="颜色 hex rgb hsl 取色 color">
-          <div class="row1"><span class="chip">CLR</span><span class="name">颜色格式转换</span>
-            <button class="star" title="收藏">☆</button></div>
-          <div class="desc">HEX / RGB / HSL 互转与预览 <span class="tag" style="margin-left:4px">P1</span></div>
-          <div class="kw">color · hex · hsl</div>
+    <!-- 分类标签 + 外观菜单 -->
+    <div class="tabs" id="tabs">
+      <div class="grow" role="tablist" aria-label="工具分类" id="tablist"></div>
+      <div class="menu-anchor">
+        <button type="button" class="icon-btn" id="themeBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="themeMenu" aria-label="外观" title="外观：跟随系统 / 亮色 / 暗色" data-theme-icon>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-monitor"></use></svg>
+        </button>
+        <div class="menu" id="themeMenu" role="menu" aria-label="外观" hidden>
+          <button type="button" role="menuitemradio" data-theme-option="auto" aria-checked="false">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-monitor"></use></svg><span>跟随系统</span>
+            <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-check"></use></svg>
+          </button>
+          <button type="button" role="menuitemradio" data-theme-option="light" aria-checked="false">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-sun"></use></svg><span>亮色</span>
+            <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-check"></use></svg>
+          </button>
+          <button type="button" role="menuitemradio" data-theme-option="dark" aria-checked="false">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-moon"></use></svg><span>暗色</span>
+            <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-check"></use></svg>
+          </button>
         </div>
       </div>
-      <div class="empty" id="empty">没有匹配的工具，换个关键词试试</div>
-
-      <div class="hint-bar">
-        <span>↵ 进入首个匹配</span>
-        <span>Esc 隐藏 uTools（遵循宿主行为）</span>
-        <span>历史与收藏仅存本机</span>
-      </div>
     </div>
-  </div>
+
+    <!-- 分区列表：由脚本按注册表渲染 -->
+    <div class="home-body" id="homeBody" role="tabpanel" tabindex="0" aria-labelledby="tab-all"></div>
+
+    <footer class="statusbar">
+      <span class="hint">
+        <kbd class="kbd"><svg class="icon icon--xs" aria-hidden="true" focusable="false"><use href="#i-arrow-up"></use></svg></kbd>
+        <kbd class="kbd"><svg class="icon icon--xs" aria-hidden="true" focusable="false"><use href="#i-arrow-down"></use></svg></kbd>
+        选择
+      </span>
+      <span class="hint"><kbd class="kbd">Enter</kbd> 打开</span>
+      <span class="grow"></span>
+      <span class="detail" id="detail"></span>
+    </footer>
+  </main>
+
 </div>
 
-<script src="assets/proto.js"></script>
 <script>
-  // 实时时钟：毫秒时间戳 + 时钟
-  protoTick((now) => {
-    document.getElementById('clockTs').textContent = now.getTime()
-    document.getElementById('clockTime').textContent =
-      now.toTimeString().slice(0, 8)
-  })
+(function () {
+  'use strict'
+  const proto = window.proto
+  const { esc, icon, TOOLS, CATEGORIES, toolById, getFavorites, getRecent } = proto
 
-  // 最近使用相对时间
-  document.querySelectorAll('#recentRow .ago').forEach(el => {
-    const min = Number(el.dataset.min || 2)
-    el.textContent = protoTimeAgo(Date.now() - min * 60000)
-  })
+  const tabsEl = document.getElementById('tabs')
+  const tablistEl = document.getElementById('tablist')
+  const bodyEl = document.getElementById('homeBody')
+  const detailEl = document.getElementById('detail')
+  const themeBtn = document.getElementById('themeBtn')
+  const themeMenu = document.getElementById('themeMenu')
+  const menuAnchor = tabsEl.querySelector('.menu-anchor')
 
-  // 收藏星标（原型演示：仅切换状态）
-  document.querySelectorAll('.star').forEach(st => {
-    st.addEventListener('click', (ev) => {
-      ev.stopPropagation()
-      const fav = st.classList.toggle('fav')
-      st.textContent = fav ? '★' : '☆'
-      window.protoToast(fav ? '已收藏（演示）' : '已取消收藏（演示）')
-    })
-  })
+  const DEFAULT_DETAIL = icon('shield') + '<span>全部计算在本机完成，不上传任何数据</span>'
+  const SUGGEST = ['时间戳', 'json', 'base64', '颜色']
 
-  // 分类过滤
-  let curCat = 'all'
-  document.querySelectorAll('.rail-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.rail-item').forEach(i => i.classList.remove('active'))
-      item.classList.add('active')
-      curCat = item.dataset.cat
-      applyFilter()
-    })
-  })
+  let cat = 'all'
+  let query = (new URLSearchParams(location.search).get('q') || '').trim()
+  let focusIndex = -1 // 重新渲染前，「全部工具」里获得焦点的行
 
-  // 关键词过滤
-  document.getElementById('filter').addEventListener('input', applyFilter)
+  const inCat = (t) => cat === 'all' || t.cat === cat
+  const countOf = (c) => TOOLS.filter((t) => c === 'all' || t.cat === c).length
 
-  function applyFilter() {
-    const kw = document.getElementById('filter').value.trim().toLowerCase()
-    let visible = 0
-    document.querySelectorAll('.tool-card').forEach(card => {
-      const hitCat = curCat === 'all' || card.dataset.cat === curCat
-      const hitKw = !kw ||
-        card.textContent.toLowerCase().includes(kw) ||
-        (card.dataset.kw || '').toLowerCase().includes(kw)
-      const show = hitCat && hitKw
-      card.style.display = show ? '' : 'none'
-      if (show) visible++
-    })
-    document.getElementById('empty').style.display = visible ? 'none' : 'block'
+  // 工具名 + 指令 + 关键词 + 说明的模糊匹配，多个词以空格分隔时须全部命中
+  const words = () => query.toLowerCase().split(/\s+/).filter(Boolean)
+  const matches = (t) => {
+    const w = words()
+    if (!w.length) return true
+    const hay = (t.name + ' ' + t.cmds.join(' ') + ' ' + t.kw + ' ' + t.desc).toLowerCase()
+    return w.every((x) => hay.includes(x))
   }
+
+  /* ---------- 模板 ---------- */
+
+  // 行容器 <li> 内：已出原型的工具是链接，其余是按钮（点击提示「尚未出原型」）；
+  // 收藏开关是主控件的同级元素，避免交互控件互相嵌套
+  function toolRow(t, extra, tail) {
+    const inner = icon(t.icon) + `<span class="name">${esc(t.name)}</span>` + (extra || '')
+    const main = t.page
+      ? `<a class="row-main" href="${t.page}.html" data-nav="${t.page}" data-id="${t.id}">${inner}</a>`
+      : `<button type="button" class="row-main" data-todo="${t.id}" data-id="${t.id}">${inner}</button>`
+    return `<li class="row">${main}${tail || ''}</li>`
+  }
+
+  const section = (id, title, inner) =>
+    `<section class="section${id === 'all' ? ' section--all' : ''}" aria-labelledby="h-${id}">` +
+    `<h2 id="h-${id}">${title}</h2><div class="section-body">${inner}</div></section>`
+
+  function emptyHTML() {
+    const where = cat === 'all' ? '' : `「${esc(CATEGORIES.find((c) => c.id === cat).name)}」分类下`
+    const tries = SUGGEST.filter((s) => {
+      const keep = query
+      query = s
+      const hit = TOOLS.some((t) => inCat(t) && matches(t))
+      query = keep
+      return hit
+    })
+    return '<div class="empty">' +
+      `<h3>${where}没有找到与「${esc(query)}」匹配的工具</h3>` +
+      '<p>按工具名称、直达指令和关键词匹配，例如 timestamp、md5、驼峰。</p>' +
+      '<div class="actions">' +
+      '<button type="button" class="btn" data-query="">清除搜索</button>' +
+      (tries.length ? '<span class="label">试试</span>' + tries.map((s) => `<button type="button" class="example" data-query="${esc(s)}">${esc(s)}</button>`).join('') : '') +
+      '</div></div>'
+  }
+
+  /* ---------- 渲染 ---------- */
+
+  const catRows = () => Array.from(bodyEl.querySelectorAll('.tools .row-main'))
+
+  function render() {
+    const active = document.activeElement
+    const keep = {
+      fav: active && active.dataset ? active.dataset.fav : null,
+      row: active && active.closest && active.closest('.tools .row-main') ? Math.max(focusIndex, 0) : null,
+    }
+
+    const favs = getFavorites().map((id) => toolById.get(id)).filter((t) => t && inCat(t) && matches(t))
+    const recent = getRecent().filter((r) => { const t = toolById.get(r.id); return t && inCat(t) && matches(t) })
+    const all = TOOLS.filter((t) => inCat(t) && matches(t))
+
+    if (!all.length) {
+      bodyEl.innerHTML = emptyHTML()
+      proto.syncFavButtons()
+      setDetail(null)
+      return
+    }
+
+    let html = ''
+    // 我的收藏：置顶分组，按收藏时间倒序（PRD 4.7.2）
+    if (favs.length) html += section('fav', '我的收藏', `<div class="quick">${favs.map((t) => toolRow(t)).join('')}</div>`)
+    // 最近使用：按最后使用时间倒序，最多 10 个（PRD 4.7.1）
+    if (recent.length) html += section('recent', '最近使用',
+      `<div class="quick">${recent.map((r) => toolRow(toolById.get(r.id), `<span class="meta">${proto.relTime(r.ts)}</span>`)).join('')}</div>`)
+    html += section('all', '全部工具',
+      `<ul class="tools" aria-label="全部工具">${all.map((t) => toolRow(t, t.p === 'P1' ? '<span class="tag">P1</span>' : '', proto.favButton(t))).join('')}</ul>`)
+
+    bodyEl.innerHTML = html
+    proto.syncFavButtons()
+
+    // 焦点落回等价元素：收藏开关 / 同序号的工具行
+    if (keep.fav) {
+      const star = bodyEl.querySelector(`.tools [data-fav="${keep.fav}"]`)
+      if (star) { star.focus(); return }
+    }
+    if (keep.row != null) {
+      const rows = catRows()
+      if (rows.length) rows[Math.min(keep.row, rows.length - 1)].focus()
+    }
+  }
+
+  function renderTabs() {
+    tablistEl.innerHTML = CATEGORIES.map((c) =>
+      `<button type="button" class="tab" role="tab" id="tab-${c.id}" data-cat="${c.id}" aria-selected="${c.id === cat}" aria-controls="homeBody">` +
+      `${esc(c.name)}<span class="n">${countOf(c.id)}</span></button>`).join('')
+    bodyEl.setAttribute('aria-labelledby', 'tab-' + cat)
+  }
+
+  function selectCat(id) {
+    cat = id
+    tablistEl.querySelectorAll('[role="tab"]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.cat === id)))
+    bodyEl.setAttribute('aria-labelledby', 'tab-' + id)
+    render()
+  }
+
+  function setQuery(text) {
+    query = (text || '').trim()
+    proto.toHost({ type: 'proto:set-input', text: query }) // 同步宿主输入框
+    render()
+  }
+
+  /* ---------- 状态栏详情：说明当前指向的工具 ---------- */
+
+  function setDetail(t) {
+    if (!t) { detailEl.innerHTML = DEFAULT_DETAIL; return }
+    detailEl.innerHTML = `<span>${esc(t.desc)}</span><code>${esc(t.kw.replace(/ /g, ' · '))}</code>`
+  }
+
+  const focusedTool = () => {
+    const main = document.activeElement && document.activeElement.closest ? document.activeElement.closest('.row-main') : null
+    return main ? toolById.get(main.dataset.id) : null
+  }
+
+  bodyEl.addEventListener('focusin', (e) => {
+    const main = e.target.closest('.row-main')
+    if (main) setDetail(toolById.get(main.dataset.id))
+  })
+  bodyEl.addEventListener('focusout', () => setTimeout(() => { if (!bodyEl.contains(document.activeElement)) setDetail(null) }, 0))
+  bodyEl.addEventListener('mouseover', (e) => {
+    const main = e.target.closest('.row-main')
+    if (main) setDetail(toolById.get(main.dataset.id))
+  })
+  bodyEl.addEventListener('mouseleave', () => setDetail(focusedTool()))
+
+  /* ---------- 列表交互 ---------- */
+
+  bodyEl.addEventListener('focusin', (e) => {
+    const main = e.target.closest('.tools .row-main')
+    if (main) focusIndex = catRows().indexOf(main)
+  })
+
+  bodyEl.addEventListener('click', (e) => {
+    const q = e.target.closest('[data-query]')
+    if (q) { setQuery(q.dataset.query); return }
+    const todo = e.target.closest('[data-todo]')
+    if (todo) window.protoToast(`「${toolById.get(todo.dataset.todo).name}」尚未出原型`)
+  })
+
+  // 两列网格：← → 移动一格，↑ ↓ 移动一行；首行再往上则把焦点交还主输入框
+  bodyEl.addEventListener('keydown', (e) => {
+    const main = e.target.closest('.tools .row-main')
+    if (!main || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+    const rows = catRows()
+    const i = rows.indexOf(main)
+    let j = i
+    if (e.key === 'ArrowRight') j = i + 1
+    else if (e.key === 'ArrowLeft') j = i - 1
+    else if (e.key === 'ArrowDown') j = i + 2
+    else if (e.key === 'ArrowUp') j = i - 2
+    else if (e.key === 'Home') j = 0
+    else if (e.key === 'End') j = rows.length - 1
+    else return
+    e.preventDefault()
+    if (j < 0) proto.toHost({ type: 'proto:focus-input' }) // 对应 utools.subInputFocus()
+    else rows[Math.min(j, rows.length - 1)].focus()
+  })
+
+  /* ---------- 分类标签 ---------- */
+
+  tabsEl.addEventListener('click', (e) => {
+    const tab = e.target.closest('[role="tab"]')
+    if (tab) selectCat(tab.dataset.cat)
+  })
+
+  tabsEl.addEventListener('keydown', (e) => {
+    const tab = e.target.closest('[role="tab"]')
+    if (!tab || e.altKey || e.ctrlKey || e.metaKey) return
+    const idx = CATEGORIES.findIndex((c) => c.id === tab.dataset.cat)
+    let j = idx
+    if (e.key === 'ArrowRight') j = (idx + 1) % CATEGORIES.length
+    else if (e.key === 'ArrowLeft') j = (idx - 1 + CATEGORIES.length) % CATEGORIES.length
+    else if (e.key === 'Home') j = 0
+    else if (e.key === 'End') j = CATEGORIES.length - 1
+    else return
+    e.preventDefault()
+    selectCat(CATEGORIES[j].id)
+    tablistEl.querySelector(`[data-cat="${CATEGORIES[j].id}"]`).focus()
+  })
+
+  // 标签上按 ↓ 直接进入列表
+  tablistEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' || e.altKey || e.ctrlKey || e.metaKey) return
+    e.preventDefault()
+    const first = catRows()[0]
+    if (first) first.focus()
+  })
+
+  /* ---------- 外观菜单：跟随系统 / 亮色 / 暗色（PRD 4.7.3）---------- */
+
+  function setMenu(open) {
+    themeMenu.hidden = !open
+    themeBtn.setAttribute('aria-expanded', String(open))
+    if (open) {
+      const current = themeMenu.querySelector('[aria-checked="true"]') || themeMenu.querySelector('button')
+      current.focus()
+    }
+  }
+
+  themeBtn.addEventListener('click', () => setMenu(themeMenu.hidden))
+
+  document.addEventListener('click', (e) => {
+    if (!themeMenu.hidden && !e.target.closest('.menu-anchor')) setMenu(false)
+  })
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-theme-option]') && themeMenu.contains(e.target)) {
+      setMenu(false)
+      themeBtn.focus()
+    }
+  })
+
+  menuAnchor.addEventListener('focusout', () => setTimeout(() => {
+    if (!menuAnchor.contains(document.activeElement)) setMenu(false)
+  }, 0))
+
+  /* ---------- 宿主联动：模拟 setSubInput(onChange) 过滤与回车直达 ---------- */
+
+  document.addEventListener('proto:host', (e) => {
+    const d = e.detail
+    if (d.type === 'proto:filter') { query = (d.text || '').trim(); render() }
+    else if (d.type === 'proto:focus-list') { const first = catRows()[0]; if (first) first.focus() }
+    else if (d.type === 'proto:enter') { const first = catRows()[0]; if (first) first.click() }
+  })
+
+  document.addEventListener('proto:fav', render)
+  document.addEventListener('proto:ready', () => { renderTabs(); render(); setDetail(null) })
+})()
 </script>
 </body>
 </html>

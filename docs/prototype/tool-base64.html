@@ -1,168 +1,258 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-zcode-design>
 <head>
 <meta charset="utf-8">
-<title>原型 · Base64 编解码</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevTools Kit · Base64 编解码</title>
 <link rel="stylesheet" href="assets/proto.css">
+<script src="assets/proto.js"></script>
 </head>
 <body>
 <div class="app">
 
-  <div class="tool-header">
-    <button class="back-btn" data-nav="home">← 返回</button>
-    <span class="chip accent">B64</span>
-    <span class="title">Base64 编解码</span>
-    <span class="kw">base64 · encode · decode</span>
-    <span class="spacer"></span>
-    <button class="star" title="收藏">☆</button>
-    <button class="icon-btn" data-action="toggle-theme">🌙</button>
+  <header class="topbar" id="shell-header" data-tool="base64"></header>
+
+  <div class="tool-body tool-body--split" style="--in-h: 40%">
+
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="编解码模式" id="modeSeg">
+        <button type="button" data-mode="auto" aria-pressed="true">自动识别</button>
+        <button type="button" data-mode="encode" aria-pressed="false">编码</button>
+        <button type="button" data-mode="decode" aria-pressed="false">解码</button>
+      </div>
+      <span class="grow"></span>
+      <button type="button" class="btn btn--ghost" id="btnSwap" title="把输出放回输入，反向再转一次">
+        <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-swap"></use></svg>交换输入输出
+      </button>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="block block--input">
+      <div class="block-head">
+        <label for="input">输入</label>
+        <span id="modeTag" class="tag" aria-live="polite">待输入</span>
+        <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" id="btnClear">清空</button>
+      </div>
+      <textarea class="textarea" id="input" spellcheck="false" aria-describedby="err"
+        placeholder="输入任意文本进行编码，或粘贴 Base64 进行解码；也可直接点下方示例"></textarea>
+      <div class="alert" id="err" role="alert" hidden></div>
+    </div>
+
+    <!-- 上下分栏分隔条：可拖拽，键盘上下键同样可调 -->
+    <div class="resizer" id="resizer" role="separator" tabindex="0" aria-orientation="horizontal"
+      aria-label="调整输入区高度" aria-controls="input" aria-valuemin="20" aria-valuemax="72" aria-valuenow="40"></div>
+
+    <!-- 输出区 -->
+    <div class="block block--fill">
+      <div class="block-head">
+        <span class="block-title" id="outLabel">输出</span>
+        <span class="note" id="stat"></span>
+        <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" id="btnCopy" title="复制输出">
+          <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-copy"></use></svg>复制
+        </button>
+      </div>
+      <div class="pane pane--text">
+        <div class="pane-scroll" id="output" tabindex="0" aria-labelledby="outLabel"></div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="content">
+  <footer class="statusbar">
+    <span class="hint"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Enter</kbd> 复制输出</span>
+    <span class="grow"></span>
+    <span>纯本地计算，文本不出本机</span>
+  </footer>
 
-    <div class="seg" id="modeSeg" style="margin-bottom:10px">
-      <button class="active" data-mode="auto">自动识别</button>
-      <button data-mode="encode">编码</button>
-      <button data-mode="decode">解码</button>
-    </div>
-
-    <div class="card">
-      <div class="label">
-        输入 <span class="tag" id="modeTag">待输入</span>
-        <span style="flex:1"></span>
-        <button class="btn mini" id="btnClear">清空</button>
-      </div>
-      <textarea class="textarea" id="input" placeholder="输入任意文本进行编码；或输入 Base64 进行解码&#10;自动识别模式：内容符合 Base64 特征时默认解码，否则编码" spellcheck="false">你好，DevTools Kit</textarea>
-      <div class="err" id="err"></div>
-    </div>
-
-    <div class="card">
-      <div class="label">输出 <span class="tag" id="outTag">—</span></div>
-      <div class="code-block" id="output"><span style="color:var(--muted)">等待输入…</span>
-        <button class="btn mini copy-corner" id="btnCopyOut">复制</button>
-      </div>
-      <div style="margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--muted)" id="stat"></div>
-    </div>
-
-    <details class="notes">
-      <summary>DESIGN NOTES · 设计说明（对应 PRD 4.3.2）</summary>
-      <ul>
-        <li>自动识别：命中 Base64 字符集且长度 %4===0 时默认解码，可手动锁定模式（功能要求）</li>
-        <li>UTF-8 安全：中文/Emoji 编解码往返正确（验收：你好 → 5L2g5aW9…）</li>
-        <li>URL-Safe 容错：<code>-</code>/<code>_</code> 自动归一化，缺省 padding 自动补齐（验收标准）</li>
-        <li>非法字符（如 <code>ab!c</code>）行内报错「包含非法字符」，不崩溃（验收标准）</li>
-        <li>底部实时统计字节数，辅助判断编码体积</li>
-      </ul>
-    </details>
-  </div>
 </div>
 
-<script src="assets/proto.js"></script>
 <script>
+(function () {
+  'use strict'
+  const proto = window.proto
+  const { esc, icon } = proto
   const $ = (id) => document.getElementById(id)
+
+  const input = $('input')
+  const output = $('output')
+  const alertEl = $('err')
+  const modeTag = $('modeTag')
+  const stat = $('stat')
+  const body = document.querySelector('.tool-body')
+  const resizer = $('resizer')
+
   let mode = 'auto' // auto | encode | decode
-  let lastResult = ''
+  let last = '' // 最近一次有效输出
 
-  const B64_RE = /^[A-Za-z0-9+/\-_]+={0,2}$/
+  const byteLen = (str) => new TextEncoder().encode(str).length
 
-  function encodeB64(str) {
+  /* ---------- 编解码（技术设计 §11.3）---------- */
+
+  function encode(str) {
     const bytes = new TextEncoder().encode(str)
     let bin = ''
-    const CHUNK = 0x8000
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-      bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-    }
-    return { ok: true, data: btoa(bin), byteLen: bytes.length }
+    const CHUNK = 0x8000 // 分块拼接，规避 apply 的参数上限
+    for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK))
+    return { ok: true, data: btoa(bin) }
   }
 
-  function decodeB64(str) {
-    let norm = str.trim().replace(/-/g, '+').replace(/_/g, '/')
-    while (norm.length % 4 !== 0) norm += '='
+  // 归一化：URL-Safe 的 - _ 还原为 + /，去掉空白，自动补齐 padding
+  function normalize(str) {
+    let s = str.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/')
+    while (s.length % 4 !== 0) s += '='
+    return s
+  }
+
+  function decode(str) {
+    const norm = normalize(str)
+    const bad = norm.match(/[^A-Za-z0-9+/=]/)
+    if (bad) return { ok: false, error: `包含非法字符「${bad[0]}」：Base64 只允许 A–Z、a–z、0–9、+、/、-、_ 和 =。` }
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(norm)) {
-      return { ok: false, error: '包含非法字符（Base64 仅支持 A-Z a-z 0-9 + / - _ =）' }
+      return { ok: false, error: '= 只能出现在末尾，且最多 2 个。' }
     }
     if (norm.replace(/=+$/, '').length % 4 === 1) {
-      return { ok: false, error: 'Base64 长度不合法（去除 padding 后长度对 4 取模不能为 1）' }
+      return { ok: false, error: '长度不合法：去掉末尾的 = 之后，字符数除以 4 不能余 1。' }
     }
     try {
       const bin = atob(norm)
-      const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
       const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-      return { ok: true, data: text, byteLen: bytes.length }
+      return { ok: true, data: text }
     } catch (e) {
-      return { ok: false, error: '解码失败：内容不是合法的 Base64 或不是有效的 UTF-8 文本' }
+      return { ok: false, error: '解码得到的不是有效的 UTF-8 文本，可能原内容是二进制数据。' }
     }
   }
 
-  function looksLikeB64(str) {
-    const t = str.trim()
-    return t.length >= 4 && B64_RE.test(t)
+  // 自动识别方向：符合 Base64 字符集与长度、且能解出可读的 UTF-8 文本时才解码，否则编码
+  function detect(raw) {
+    const compact = raw.replace(/\s+/g, '')
+    if (compact.length < 4 || !/^[A-Za-z0-9+/\-_]+={0,2}$/.test(compact)) return 'encode'
+    const res = decode(compact)
+    if (!res.ok || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]/.test(res.data)) return 'encode'
+    return 'decode'
+  }
+
+  /* ---------- 渲染 ---------- */
+
+  function showEmpty() {
+    last = ''
+    modeTag.textContent = '待输入'
+    modeTag.className = 'tag'
+    stat.textContent = ''
+    output.innerHTML = '<span class="placeholder">粘贴 Base64 字符串或任意文本，这里会实时给出另一个方向的结果。</span>' +
+      '<div class="examples">' +
+      ['5L2g5aW9', 'hello', '你好，DevTools Kit'].map((x) => `<button type="button" class="example" data-fill="${esc(x)}">${esc(x)}</button>`).join('') +
+      '</div>'
   }
 
   function run() {
-    const raw = $('input').value
-    hideErr()
-    if (!raw) {
-      $('output').innerHTML = '<span style="color:var(--muted)">等待输入…</span>'
-      $('modeTag').textContent = '待输入'
-      $('outTag').textContent = '—'
-      $('stat').textContent = ''
+    const raw = input.value
+    proto.clearError(alertEl, input)
+    if (!raw) { showEmpty(); return }
+
+    const eff = mode === 'auto' ? detect(raw) : mode
+    const res = eff === 'decode' ? decode(raw) : encode(raw)
+
+    modeTag.textContent = mode === 'auto' ? '自动识别 · ' + (eff === 'decode' ? '解码' : '编码') : (eff === 'decode' ? '解码' : '编码')
+    modeTag.className = 'tag' + (mode === 'auto' ? ' tag--ok' : '')
+
+    if (!res.ok) {
+      last = ''
+      proto.setError(alertEl, input, { message: res.error })
+      modeTag.className = 'tag tag--err'
+      modeTag.textContent = (eff === 'decode' ? '解码' : '编码') + '失败'
+      stat.textContent = ''
+      output.innerHTML = '<span class="placeholder">修正输入后，结果会显示在这里。</span>'
       return
     }
 
-    let effMode = mode
-    if (mode === 'auto') {
-      effMode = looksLikeB64(raw) ? 'decode' : 'encode'
-      $('modeTag').textContent = '自动 → ' + (effMode === 'decode' ? '解码' : '编码')
-    } else {
-      $('modeTag').textContent = effMode === 'decode' ? '手动解码' : '手动编码'
-    }
-
-    const res = effMode === 'decode' ? decodeB64(raw) : encodeB64(raw)
-    if (!res.ok) {
-      $('output').innerHTML = '<span style="color:var(--muted)">—</span>'
-      $('outTag').textContent = '—'
-      $('stat').textContent = ''
-      return showErr(res.error)
-    }
-
-    const esc = window.protoEsc(res.data)
-    $('output').textContent = ''
-    $('output').insertAdjacentHTML('afterbegin', esc)
-    // 重新挂载复制角标（innerHTML 被清理过）
-    const btn = document.createElement('button')
-    btn.className = 'btn mini copy-corner'
-    btn.id = 'btnCopyOut'
-    btn.textContent = '复制'
-    $('output').appendChild(btn)
-    btn.addEventListener('click', () => window.protoCopy(lastResult || '', '结果'))
-
-    $('outTag').textContent = effMode === 'decode' ? 'Base64 → 文本' : '文本 → Base64'
-    $('stat').textContent =
-      `输入 ${new TextEncoder().encode(raw).length} B · 输出 ${res.data.length} 字符 · 输入内容 ${res.byteLen} B`
-    lastResult = res.data
+    last = res.data
+    output.textContent = res.data
+    stat.textContent = eff === 'decode'
+      ? `Base64 ${raw.length} 字符 → ${byteLen(res.data)} B 文本`
+      : `${byteLen(raw)} B 文本 → Base64 ${res.data.length} 字符`
   }
 
-  function showErr(msg) {
-    const el = $('err')
-    el.textContent = '✋ ' + msg
-    el.classList.add('show')
-  }
-  function hideErr() { $('err').classList.remove('show') }
-
-  $('input').addEventListener('input', run)
-  $('btnClear').addEventListener('click', () => { $('input').value = ''; run(); $('input').focus() })
-
-  document.querySelectorAll('#modeSeg button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#modeSeg button').forEach(b => b.classList.remove('active'))
-      btn.classList.add('active')
-      mode = btn.dataset.mode
-      run()
-    })
+  input.addEventListener('input', run)
+  $('btnClear').addEventListener('click', () => { input.value = ''; run(); input.focus() })
+  $('btnCopy').addEventListener('click', () => protoCopy(last, '输出'))
+  $('btnSwap').addEventListener('click', () => {
+    if (!last) return
+    if (mode === 'encode') setMode('decode')
+    else if (mode === 'decode') setMode('encode')
+    input.value = last
+    run()
+    input.focus()
+  })
+  output.addEventListener('click', (e) => {
+    const f = e.target.closest('[data-fill]')
+    if (f) { input.value = f.dataset.fill; run(); input.focus() }
   })
 
-  run()
+  function setMode(next) {
+    mode = next
+    document.querySelectorAll('#modeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)))
+  }
+
+  document.querySelectorAll('#modeSeg button').forEach((b) => b.addEventListener('click', () => { setMode(b.dataset.mode); run() }))
+
+  /* ---------- 分栏拖拽 / 键盘调整 ---------- */
+
+  let ratio = 40
+  const applyRatio = () => {
+    ratio = Math.min(72, Math.max(20, ratio))
+    body.style.setProperty('--in-h', ratio + '%')
+    resizer.setAttribute('aria-valuenow', String(Math.round(ratio)))
+  }
+
+  resizer.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    e.preventDefault()
+    ratio += e.key === 'ArrowUp' ? -4 : 4
+    applyRatio()
+  })
+
+  resizer.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    resizer.classList.add('is-dragging')
+    resizer.setPointerCapture(e.pointerId)
+    const rect = () => body.getBoundingClientRect()
+    const move = (ev) => {
+      const r = rect()
+      ratio = ((ev.clientY - r.top) / r.height) * 100
+      applyRatio()
+    }
+    move(e)
+    const up = () => {
+      resizer.classList.remove('is-dragging')
+      resizer.removeEventListener('pointermove', move)
+      resizer.removeEventListener('pointerup', up)
+      resizer.removeEventListener('pointercancel', up)
+    }
+    resizer.addEventListener('pointermove', move)
+    resizer.addEventListener('pointerup', up)
+    resizer.addEventListener('pointercancel', up)
+  })
+
+  /* ---------- Ctrl+Enter 复制输出 ---------- */
+
+  window.protoMainCopy = () => protoCopy(last, '输出')
+
+  /* ---------- 初始 ---------- */
+
+  document.addEventListener('proto:ready', () => {
+    const demo = new URLSearchParams(location.search).get('demo') || ''
+    if (demo === 'empty') input.value = ''
+    else if (demo === 'error') { setMode('decode'); input.value = 'ab!c' }
+    else if (demo === 'decode') input.value = '5L2g5aW9'
+    else input.value = '你好，DevTools Kit'
+    run()
+    input.focus() // 呼起即聚焦，Ctrl+V 直接粘贴（PRD 4.2-3）
+  })
+})()
 </script>
 </body>
 </html>

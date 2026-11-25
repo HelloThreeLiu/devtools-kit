@@ -1,221 +1,437 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-zcode-design>
 <head>
 <meta charset="utf-8">
-<title>原型 · JSON 格式化</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevTools Kit · JSON 格式化</title>
 <link rel="stylesheet" href="assets/proto.css">
-<style>
-  .json-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-  .json-toolbar .spacer { flex: 1; }
-  .meta {
-    display: flex;
-    gap: 14px;
-    margin-top: 8px;
-    font-family: var(--mono);
-    font-size: 10.5px;
-    color: var(--muted);
-  }
-</style>
+<script src="assets/proto.js"></script>
 </head>
 <body>
 <div class="app">
 
-  <div class="tool-header">
-    <button class="back-btn" data-nav="home">← 返回</button>
-    <span class="chip accent">JSON</span>
-    <span class="title">JSON 格式化</span>
-    <span class="kw">json · format · validate</span>
-    <span class="spacer"></span>
-    <button class="star fav" style="color:#f5a623" title="收藏">★</button>
-    <button class="icon-btn" data-action="toggle-theme">🌙</button>
+  <header class="topbar" id="shell-header" data-tool="json"></header>
+
+  <div class="tool-body tool-body--split" style="--in-h: 38%">
+
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="输出格式" id="indentSeg">
+        <button type="button" data-indent="2" aria-pressed="true">2 空格</button>
+        <button type="button" data-indent="4" aria-pressed="false">4 空格</button>
+        <button type="button" data-indent="tab" aria-pressed="false">Tab</button>
+        <button type="button" data-indent="min" aria-pressed="false">压缩为一行</button>
+      </div>
+      <span class="grow"></span>
+      <span class="tag" id="validTag" aria-live="polite">待输入</span>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="block block--input">
+      <div class="block-head">
+        <label for="input">输入 JSON</label>
+        <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" id="btnSample">载入示例</button>
+        <button type="button" class="btn btn--ghost" id="btnClear">清空</button>
+      </div>
+      <textarea class="textarea" id="input" spellcheck="false" aria-describedby="err"
+        placeholder="粘贴压缩的 JSON，自动格式化并校验"></textarea>
+      <div class="alert" id="err" role="alert" hidden></div>
+    </div>
+
+    <!-- 上下分栏分隔条：可拖拽，键盘上下键同样可调 -->
+    <div class="resizer" id="resizer" role="separator" tabindex="0" aria-orientation="horizontal"
+      aria-label="调整输入区高度" aria-controls="input" aria-valuemin="20" aria-valuemax="72" aria-valuenow="38"></div>
+
+    <!-- 输出区：逐行渲染，带折叠 -->
+    <div class="block block--fill">
+      <div class="block-head">
+        <span class="block-title" id="outLabel">格式化结果</span>
+        <span class="note" id="stat"></span>
+        <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" id="btnExpandAll">全部展开</button>
+        <button type="button" class="btn btn--ghost" id="btnCollapseAll">全部收起</button>
+        <button type="button" class="btn btn--ghost" id="btnCopy" title="复制完整结果（不受折叠影响）">
+          <svg class="icon icon--sm" aria-hidden="true" focusable="false"><use href="#i-copy"></use></svg>复制
+        </button>
+      </div>
+      <div class="pane">
+        <div class="pane-scroll" id="output" tabindex="0" aria-labelledby="outLabel"></div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="content">
+  <footer class="statusbar">
+    <span class="hint"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Enter</kbd> 复制结果</span>
+    <span class="grow"></span>
+    <span>点击行号旁的箭头折叠 / 展开节点</span>
+  </footer>
 
-    <div class="json-toolbar">
-      <div class="seg" id="indentSeg">
-        <button class="active" data-indent="2">2 空格</button>
-        <button data-indent="4">4 空格</button>
-        <button data-indent="\t">Tab</button>
-      </div>
-      <button class="btn" id="btnMinify">压缩为一行</button>
-      <span class="spacer"></span>
-      <span class="tag" id="validTag">校验中…</span>
-    </div>
-
-    <div class="card">
-      <div class="label">
-        输入 JSON
-        <span style="flex:1"></span>
-        <button class="btn mini" id="btnSample">示例</button>
-        <button class="btn mini" id="btnClear">清空</button>
-      </div>
-      <textarea class="textarea" id="input" style="min-height:96px" spellcheck="false"></textarea>
-      <div class="err" id="err"></div>
-    </div>
-
-    <div class="card">
-      <div class="label">
-        格式化结果
-        <span style="flex:1"></span>
-        <button class="btn mini" id="btnCopyOut">复制</button>
-      </div>
-      <div class="code-block" id="output" style="max-height:180px"></div>
-      <div class="meta">
-        <span id="mLines">0 行</span>
-        <span id="mSize">0 B</span>
-        <span id="mKeys">—</span>
-      </div>
-    </div>
-
-    <details class="notes">
-      <summary>DESIGN NOTES · 设计说明（对应 PRD 4.3.4）</summary>
-      <ul>
-        <li>校验失败定位到 <code>行:列</code>（由 <code>SyntaxError.position</code> 换算），红色行内提示（验收标准）</li>
-        <li>语法高亮自研 tokenizer，不引入 highlight.js（包体积约束 §11.5）</li>
-        <li>输出 &gt; 5000 行截断渲染并提示，复制始终完整（Q2 首版策略）</li>
-        <li>大输入（&gt;100KB）debounce 200ms 再计算（§12 性能约定）</li>
-        <li>工具页可通过 <code>setExpandHeight(600)</code> 临时增高（plugin.json 默认 544）</li>
-      </ul>
-    </details>
-  </div>
 </div>
 
-<script src="assets/proto.js"></script>
 <script>
+(function () {
+  'use strict'
+  const proto = window.proto
+  const { esc, icon } = proto
   const $ = (id) => document.getElementById(id)
-  let indent = '2'
-  let lastResult = ''
+
+  const input = $('input')
+  const output = $('output')
+  const alertEl = $('err')
+  const validTag = $('validTag')
+  const stat = $('stat')
+  const body = document.querySelector('.tool-body')
+  const resizer = $('resizer')
 
   const SAMPLE = '{"name":"devtools-kit","version":"1.0.0","description":"uTools 开发工具箱","tools":[{"id":"timestamp","p0":true},{"id":"base64","p0":true},{"id":"json","p0":true}],"meta":{"author":"HelloThreeLiu","stars":42,"active":true,"repo":null}}'
+  const MAX_LINES = 5000 // 超出仅渲染前 5000 行，复制仍为完整内容（技术设计 §11.5）
 
-  /* ---------- 语法高亮 tokenizer ---------- */
+  let format = '2' // 2 | 4 | tab | min
+  let lastResult = '' // 完整的输出文本
+  let lines = [] // 当前输出的各行
+  let folds = new Map() // 起始行序号 → 结束行序号
+  let collapsed = new Set() // 已折叠的起始行序号
 
-  function highlightJSON(src) {
-    const esc = window.protoEsc
-    const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(\btrue\b|\bfalse\b)|(\bnull\b)|([{}\[\],])/g
-    let out = '', i = 0, m
-    while ((m = re.exec(src))) {
-      out += esc(src.slice(i, m.index))
-      let cls = 'tk-pun'
-      if (m[1] && m[2]) out += `<span class="tk-key">${esc(m[1])}</span><span class="tk-pun">${esc(m[2])}</span>`
-      else if (m[1]) out += `<span class="tk-str">${esc(m[1])}</span>`
-      else if (m[3]) out += `<span class="tk-num">${esc(m[3])}</span>`
-      else if (m[4]) out += `<span class="tk-bool">${esc(m[4])}</span>`
-      else if (m[5]) out += `<span class="tk-bool">${esc(m[5])}</span>`
-      else out += `<span class="${cls}">${esc(m[0])}</span>`
-      i = m.index + m[0].length
+  const byteLen = (str) => new TextEncoder().encode(str).length
+
+  /* ---------- 校验：自写轻量校验器，稳定给出 行 / 列 / 原因 ----------
+     不依赖 JSON.parse 的报错文案：Chromium 对部分语法错误不再附带位置信息 */
+
+  function lint(src) {
+    const n = src.length
+    let i = 0
+    let line = 1
+    let col = 1
+    const stack = [] // 未闭合的 '{' 或 '['
+    const states = [] // 与 stack 对应：key-or-end | colon | value | value-or-end | comma-or-end
+    const fail = (reason) => ({ ok: false, pos: i, line, col, reason })
+    const failAt = (reason, at) => ({ ok: false, pos: at.i, line: at.line, col: at.col, reason })
+    const adv = () => { if (src[i] === '\n') { line++; col = 1 } else col++; i++ }
+    const ws = () => { while (i < n && /\s/.test(src[i])) adv() }
+    const show = (c) => (c === undefined ? '（内容结束）' : `「${c}」`)
+
+    function scanString() {
+      adv() // 开头的双引号
+      while (i < n) {
+        const c = src[i]
+        if (c === '"') { adv(); return true }
+        if (c === '\\') {
+          const e = src[i + 1]
+          if (e === undefined) { adv(); return fail('字符串没有闭合，并且转义不完整') }
+          // JSON 的合法转义：\" \\ \/ \b \f \n \r \t \uXXXX
+          if (!/["\\\/bfnrtu]/.test(e)) return fail(`无效的转义 \\${e}`)
+          if (e === 'u') {
+            if (!/^[0-9a-fA-F]{4}$/.test(src.slice(i + 2, i + 6))) return fail('\\u 后面需要 4 位十六进制数')
+            adv(); adv(); adv(); adv()
+          }
+          adv(); adv()
+          continue
+        }
+        if (c < ' ') return fail('字符串里有未转义的控制字符（如换行、制表符）')
+        adv()
+      }
+      return fail('字符串没有闭合，缺少结尾的双引号')
     }
-    out += esc(src.slice(i))
-    return out
+
+    function parseValue() {
+      const c = src[i]
+      if (c === undefined) return fail(stack.length ? unclosed() : '这里缺少一个值')
+      if (c === '"') return scanString()
+      if (c === '{' || c === '[') { stack.push(c); states.push(c === '{' ? 'key-or-end' : 'value-or-end'); adv(); return true }
+      if (c === 't' || c === 'f' || c === 'n') {
+        const lit = c === 't' ? 'true' : c === 'f' ? 'false' : 'null'
+        const start = { i, line, col } // 报错指到字面量开头，而不是出错的那一位
+        for (let k = 0; k < lit.length; k++) {
+          if (src[i] !== lit[k]) return failAt(`这里应为 ${lit}`, start)
+          adv()
+        }
+        return true
+      }
+      if (c === '-' || (c >= '0' && c <= '9')) {
+        const m = src.slice(i).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/)
+        if (!m) return fail('负号后面缺少数字')
+        for (let k = 0; k < m[0].length; k++) adv()
+        if (src[i] === '.') return fail('小数点后面缺少数字')
+        return true
+      }
+      if (c === ',' && states[states.length - 1] === 'value-or-end') return fail('数组的第一项前面不能有逗号')
+      return fail(`意外的字符${show(c)}，这里应是一个值（字符串、数字、true / false / null、{} 或 []）`)
+    }
+
+    const unclosed = () => {
+      const need = stack.slice().reverse().map((c) => (c === '{' ? '}' : ']')).join(' ')
+      return `内容不完整：还有 ${stack.length} 个括号没有闭合，需要补上 ${need}`
+    }
+
+    ws()
+    if (i >= n) return fail('内容为空')
+    let r = parseValue()
+    if (r !== true) return r
+
+    while (stack.length) {
+      const top = stack.length - 1
+      const close = stack[top] === '{' ? '}' : ']'
+      const st = states[top]
+      ws()
+      const c = src[i]
+
+      if (st === 'key-or-end') { // 刚进入 { 或逗号之后：应为 " 或 }
+        if (c === close) { adv(); stack.pop(); states.pop(); continue }
+        if (c === undefined) return fail(unclosed())
+        if (c === '"') { r = scanString(); if (r !== true) return r; states[top] = 'colon'; continue }
+        return fail(`意外的字符${show(c)}，这里应为属性名（双引号字符串）或 ${close}`)
+      }
+      if (st === 'colon') { // 属性名之后：应为 :
+        if (c === ':') {
+          adv(); states[top] = 'value'; ws()
+          r = parseValue(); if (r !== true) return r
+          states[top] = 'comma-or-end'; continue
+        }
+        return fail(`属性名后面缺少冒号 :（收到${show(c)}）`)
+      }
+      if (st === 'value-or-end') { // 刚进入 [：应为值或 ]
+        if (c === ']') { adv(); stack.pop(); states.pop(); continue }
+        if (c === undefined) return fail(unclosed())
+        r = parseValue(); if (r !== true) return r
+        states[top] = 'comma-or-end'; continue
+      }
+      // st === 'comma-or-end'：一个值之后：应为 , 或闭合
+      if (c === close) { adv(); stack.pop(); states.pop(); continue }
+      if (c === ',') {
+        adv(); ws()
+        const next = stack[top] === '{' ? 'key-or-end' : 'value-or-end'
+        if (src[i] === undefined) return fail(unclosed())
+        if (src[i] === close) return fail(`多了一个逗号：${close} 的前面不能再有逗号`)
+        states[top] = next; continue
+      }
+      if (c === undefined) return fail(unclosed())
+      return fail(`意外的字符${show(c)}，这里应为逗号 , 或 ${close}`)
+    }
+
+    ws()
+    if (i < n) return fail('JSON 已经结束，后面还有多余的内容')
+    return { ok: true }
   }
 
-  /* ---------- 主逻辑 ---------- */
+  /* ---------- 语法高亮：单正则逐 token 着色，不引入 highlight.js ---------- */
 
-  let debounceTimer = null
+  const TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(\btrue\b|\bfalse\b|\bnull\b)|([{}[\],])/g
 
-  function run() {
-    const raw = $('input').value
-    hideErr()
+  function hl(text) {
+    let out = ''
+    let last = 0
+    let m
+    TOKEN.lastIndex = 0
+    while ((m = TOKEN.exec(text))) {
+      out += esc(text.slice(last, m.index))
+      if (m[1] !== undefined) {
+        out += m[2] !== undefined
+          ? `<span class="tk-key">${esc(m[1])}</span><span class="tk-pun">${esc(m[2])}</span>`
+          : `<span class="tk-str">${esc(m[1])}</span>`
+      } else if (m[3] !== undefined) out += `<span class="tk-num">${esc(m[3])}</span>`
+      else if (m[4] !== undefined) out += `<span class="tk-bool">${esc(m[4])}</span>`
+      else out += `<span class="tk-pun">${esc(m[5])}</span>`
+      last = m.index + m[0].length
+    }
+    return out + esc(text.slice(last))
+  }
 
-    if (!raw.trim()) {
-      $('validTag').textContent = '待输入'
-      $('output').innerHTML = '<span style="color:var(--muted)">粘贴 JSON 后自动格式化…</span>'
-      ;['mLines', 'mSize', 'mKeys'].forEach(id => $(id).textContent = id === 'mKeys' ? '—' : '0')
-      lastResult = ''
+  /* ---------- 折叠：按行记录区间（技术设计 §11.5）---------- */
+
+  function computeFolds(list) {
+    const map = new Map()
+    const open = []
+    list.forEach((text, idx) => {
+      const t = text.trim()
+      if (/^[}\]]/.test(t) && open.length) map.set(open.pop(), idx)
+      if (/[{[]$/.test(t)) open.push(idx)
+    })
+    return map
+  }
+
+  function renderOutput(hint) {
+    const top = output.scrollTop
+    const left = output.scrollLeft
+    if (!lines.length) {
+      output.innerHTML = `<span class="placeholder">${hint || '粘贴 JSON 后自动格式化。'}</span>` +
+        (hint ? '' : '<div class="examples"><button type="button" class="example" data-sample>载入示例</button></div>')
       return
     }
-
-    let parsed
-    try {
-      parsed = JSON.parse(raw)
-      $('validTag').textContent = '✓ 合法 JSON'
-      $('validTag').className = 'tag'
-    } catch (e) {
-      $('validTag').textContent = '✗ 语法错误'
-      $('validTag').className = 'tag warn'
-      $('output').innerHTML = '<span style="color:var(--muted)">—</span>'
-      $('mLines').textContent = '—'
-      $('mSize').textContent = '—'
-      $('mKeys').textContent = '—'
-      lastResult = ''
-      return showErr(e, raw)
+    const total = lines.length
+    const shown = total > MAX_LINES ? lines.slice(0, MAX_LINES) : lines
+    const single = shown.length === 1 // 压缩为一行时不折叠
+    const html = []
+    for (let i = 0; i < shown.length; i++) {
+      let code = hl(shown[i])
+      const isOpen = !single && folds.has(i)
+      const folded = isOpen && collapsed.has(i)
+      let toggle = '<span class="ln-gutter" aria-hidden="true"></span>'
+      if (isOpen) {
+        toggle = `<button type="button" class="ln-toggle" data-fold="${i}" aria-expanded="${!folded}" aria-label="${folded ? '展开' : '折叠'}第 ${i + 1} 行" title="${folded ? '展开' : '折叠'}">${icon('chevron-right', 'icon icon--xs')}</button>`
+      }
+      const no = i + 1
+      if (folded) {
+        const close = folds.get(i)
+        code += `<span class="fold-mark">… ${close - i - 1} 行</span><span class="ln-bracket">${esc(shown[close].trim())}</span>`
+        i = close // 被折叠的行与闭合行都不再单独输出
+      }
+      html.push(`<div class="ln${folded ? ' is-folded' : ''}"><span class="ln-no" aria-hidden="true">${no}</span>${toggle}<span class="ln-code">${code}</span></div>`)
     }
-
-    const space = indent === '\\t' ? '\t' : Number(indent)
-    const text = JSON.stringify(parsed, null, space)
-    lastResult = text
-
-    const lines = text.split('\n')
-    const MAX = 5000
-    const shown = lines.length > MAX
-      ? lines.slice(0, MAX).join('\n') + `\n…（共 ${lines.length} 行，已截断显示，复制仍为完整内容）`
-      : text
-
-    $('output').innerHTML = highlightJSON(shown)
-
-    $('mLines').textContent = lines.length + ' 行' + (shown ? (lines.length > MAX ? '（截断显示）' : '') : '')
-    $('mSize').textContent = new TextEncoder().encode(raw).length + ' B'
-    const countKeys = (o) => {
-      if (Array.isArray(o)) return o.length + ' 项'
-      if (o && typeof o === 'object') return Object.keys(o).length + ' 个键'
-      return typeof o
+    if (total > MAX_LINES) {
+      html.push(`<div class="ln"><span class="ln-no"></span><span class="ln-gutter"></span><span class="pane-note">共 ${total} 行，仅显示前 ${MAX_LINES} 行；复制仍为完整内容</span></div>`)
     }
-    $('mKeys').textContent = '根节点：' + countKeys(parsed)
+    output.innerHTML = html.join('')
+    output.scrollTop = top
+    output.scrollLeft = left
   }
 
-  function showErr(e, raw) {
-    let msg = e.message.replace(/^JSON\.parse:?\s*/i, '')
-    // V8: "Unexpected token x in JSON at position N" → 换算行列
-    const pm = e.message.match(/position (\d+)/i)
-    if (pm) {
-      const pos = Number(pm[1])
-      const before = raw.slice(0, pos)
-      const line = before.split('\n').length
-      const col = pos - before.lastIndexOf('\n')
-      msg = `第 ${line} 行 第 ${col} 列：${msg}`
-    }
-    const el = $('err')
-    el.textContent = '✋ ' + msg
-    el.classList.add('show')
+  /* ---------- 主流程 ---------- */
+
+  function showEmpty() {
+    lastResult = ''
+    lines = []
+    folds = new Map()
+    collapsed = new Set()
+    validTag.textContent = '待输入'
+    validTag.className = 'tag'
+    stat.textContent = ''
+    renderOutput()
   }
-  function hideErr() { $('err').classList.remove('show') }
 
-  $('input').addEventListener('input', () => {
-    clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(run, 200)
-  })
+  function showError(src, e) {
+    lastResult = ''
+    lines = []
+    validTag.innerHTML = icon('alert', 'icon icon--xs') + `语法错误 · 第 ${e.line} 行`
+    validTag.className = 'tag tag--err'
 
-  $('btnSample').addEventListener('click', () => { $('input').value = SAMPLE; run() })
-  $('btnClear').addEventListener('click', () => { $('input').value = ''; run(); $('input').focus() })
-  $('btnCopyOut').addEventListener('click', () => window.protoCopy(lastResult, '格式化结果'))
+    // 出错行摘录 + 插入符
+    const text = src.split('\n')[e.line - 1] || ''
+    const HALF = 40
+    const start = Math.max(0, e.col - 1 - HALF)
+    const end = Math.min(text.length, start + HALF * 2)
+    const pre = start > 0 ? '…' : ''
+    const caretAt = pre.length + Math.max(0, e.col - 1 - start)
+    const detail = `<pre class="excerpt" aria-hidden="true"><code>${esc(pre + text.slice(start, end)) || ' '}</code>\n${' '.repeat(caretAt)}<span class="caret">^</span></pre>`
 
-  document.querySelectorAll('#indentSeg button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#indentSeg button').forEach(b => b.classList.remove('active'))
-      btn.classList.add('active')
-      indent = btn.dataset.indent
-      run()
+    proto.setError(alertEl, input, {
+      message: `第 ${e.line} 行第 ${e.col} 列：${e.reason}`,
+      detail,
+      action: { label: '定位到出错位置', run: () => { input.focus(); input.setSelectionRange(e.pos, e.pos + 1) } },
     })
+    stat.textContent = ''
+    renderOutput('修正输入后，格式化结果会显示在这里。')
+  }
+
+  function run() {
+    const raw = input.value
+    proto.clearError(alertEl, input)
+    if (!raw.trim()) { showEmpty(); return }
+
+    const check = lint(raw)
+    if (!check.ok) { showError(raw, check); return }
+
+    const parsed = JSON.parse(raw)
+    const text = format === 'min' ? JSON.stringify(parsed) : JSON.stringify(parsed, null, format === 'tab' ? '\t' : Number(format))
+    lastResult = text
+    lines = text.split('\n')
+    folds = computeFolds(lines.length > MAX_LINES ? lines.slice(0, MAX_LINES) : lines)
+    collapsed = new Set()
+
+    validTag.innerHTML = icon('check', 'icon icon--xs') + '合法 JSON'
+    validTag.className = 'tag tag--ok'
+    const root = Array.isArray(parsed) ? `${parsed.length} 项` : parsed && typeof parsed === 'object' ? `${Object.keys(parsed).length} 个键` : typeof parsed
+    stat.textContent = `${lines.length} 行 · ${byteLen(text)} B · 根节点 ${root}`
+    renderOutput()
+  }
+
+  // 输入即转换；超过 100KB 时防抖 200ms（技术设计 §12）
+  let timer = 0
+  input.addEventListener('input', () => {
+    clearTimeout(timer)
+    timer = setTimeout(run, input.value.length > 100 * 1024 ? 200 : 0)
   })
 
-  $('btnMinify').addEventListener('click', () => {
-    if (!lastResult && !$('input').value.trim()) return
-    try {
-      lastResult = JSON.stringify(JSON.parse($('input').value))
-      $('output').innerHTML = highlightJSON(lastResult)
-      window.protoToast('已压缩为一行')
-    } catch (e) { showErr(e, $('input').value) }
+  $('btnClear').addEventListener('click', () => { input.value = ''; run(); input.focus() })
+  $('btnSample').addEventListener('click', () => { input.value = SAMPLE; run(); input.focus() })
+  $('btnCopy').addEventListener('click', () => protoCopy(lastResult, '格式化结果'))
+  $('btnExpandAll').addEventListener('click', () => { collapsed = new Set(); renderOutput() })
+  $('btnCollapseAll').addEventListener('click', () => { collapsed = new Set(folds.keys()); renderOutput() })
+
+  output.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-fold]')
+    if (t) {
+      const idx = Number(t.dataset.fold)
+      if (collapsed.has(idx)) collapsed.delete(idx); else collapsed.add(idx)
+      renderOutput()
+      const again = output.querySelector(`[data-fold="${idx}"]`)
+      if (again) again.focus({ preventScroll: true })
+      return
+    }
+    if (e.target.closest('[data-sample]')) { input.value = SAMPLE; run(); input.focus() }
   })
 
-  // 初始示例
-  $('input').value = SAMPLE
-  run()
+  function setFormat(next) {
+    format = next
+    document.querySelectorAll('#indentSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.indent === format)))
+    run()
+  }
+
+  document.querySelectorAll('#indentSeg button').forEach((b) => b.addEventListener('click', () => setFormat(b.dataset.indent)))
+
+  /* ---------- 分栏拖拽 / 键盘调整 ---------- */
+
+  let ratio = 38
+  const applyRatio = () => {
+    ratio = Math.min(72, Math.max(20, ratio))
+    body.style.setProperty('--in-h', ratio + '%')
+    resizer.setAttribute('aria-valuenow', String(Math.round(ratio)))
+  }
+
+  resizer.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+    e.preventDefault()
+    ratio += e.key === 'ArrowUp' ? -4 : 4
+    applyRatio()
+  })
+
+  resizer.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    resizer.classList.add('is-dragging')
+    resizer.setPointerCapture(e.pointerId)
+    const move = (ev) => {
+      const r = body.getBoundingClientRect()
+      ratio = ((ev.clientY - r.top) / r.height) * 100
+      applyRatio()
+    }
+    move(e)
+    const up = () => {
+      resizer.classList.remove('is-dragging')
+      resizer.removeEventListener('pointermove', move)
+      resizer.removeEventListener('pointerup', up)
+      resizer.removeEventListener('pointercancel', up)
+    }
+    resizer.addEventListener('pointermove', move)
+    resizer.addEventListener('pointerup', up)
+    resizer.addEventListener('pointercancel', up)
+  })
+
+  /* ---------- Ctrl+Enter 复制完整结果（不受折叠影响）---------- */
+
+  window.protoMainCopy = () => protoCopy(lastResult, '格式化结果')
+
+  /* ---------- 初始 ---------- */
+
+  document.addEventListener('proto:ready', () => {
+    const demo = new URLSearchParams(location.search).get('demo') || ''
+    if (demo === 'empty') input.value = ''
+    else if (demo === 'error') input.value = '{\n  "name": "devtools-kit",\n  "version": "1.0.0",\n}'
+    else input.value = SAMPLE
+    run()
+    input.focus() // 呼起即聚焦，Ctrl+V 直接粘贴（PRD 4.2-3）
+  })
+})()
 </script>
 </body>
 </html>
