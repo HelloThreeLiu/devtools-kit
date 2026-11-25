@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一分支的新提交取消仍在跑的旧任务
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 插件目标平台：Windows / macOS / Linux（跟随 uTools Runtime 支持范围）
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate plugin.json
+        run: node scripts/validate-plugin.mjs
+
+      - name: Build (vite)
+        run: npm run build
+
+      - name: Verify dist plugin structure
+        run: node scripts/check-dist.mjs
+
+      # 单测：M2 引入 vitest 后启用
+      # - name: Unit tests
+      #   run: npm test
+
+      - name: Upload dist artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
