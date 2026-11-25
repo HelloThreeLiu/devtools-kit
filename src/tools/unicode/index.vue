@@ -3,10 +3,12 @@
  * Unicode 转中文（PRD 4.3.7）
  * \uXXXX / \u{...} / &#xHHHH; 解码；非 ASCII → \uXXXX 编码；自动识别方向
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertUnicode } from '../../utils/convert/unicode.js'
 import { copyText } from '../../utils/clipboard.js'
+import { recordHistory } from '../../utils/db.js'
+import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
 const input = ref('')
@@ -73,7 +75,7 @@ onMounted(() => {
         v-model="input"
         class="textarea"
         style="min-height: 72px"
-        placeholder="解码：\u4f60\u597d / &#x4f60;&#x597d;&#1025; → 中文字符&#10;编码：中文与 Emoji → \uXXXX（BMP 外自动拆代理对）"
+        placeholder="解码：\u4f60\u597d / &#x4f60;&#x597d; → 中文字符&#10;编码：中文与 Emoji → \uXXXX（BMP 外自动拆代理对）"
         spellcheck="false"
       ></textarea>
     </div>
