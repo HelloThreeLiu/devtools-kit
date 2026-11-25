@@ -7,28 +7,14 @@
   },
   "features": [
     {
-      "code": "hello",
-      "explain": "打个招呼",
-      "cmds": [
-        "hello"
-      ]
+      "code": "devtools-kit",
+      "description": "开发工具箱：聚合高频开发辅助工具",
+      "cmds": ["开发工具箱", "工具箱", "devtools"]
     },
     {
-      "code": "read-text",
-      "explain": "读 txt、md 文档示例",
-      "cmds": [
-        "读文档示例",
-        {
-          "type": "files",
-          "fileType": "file",
-          "extensions": [
-            "txt",
-            "md"
-          ],
-          "maxLength": 1,
-          "label": "读文档示例"
-        }
-      ]
+      "code": "timestamp",
+      "description": "时间戳与日期时间双向转换",
+      "cmds": ["时间戳", "时间戳转换", "timestamp"]
     }
   ]
 }

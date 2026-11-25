@@ -43,9 +43,8 @@ jobs:
       - name: Verify dist plugin structure
         run: node scripts/check-dist.mjs
 
-      # 单测：M2 引入 vitest 后启用
-      # - name: Unit tests
-      #   run: npm test
+      - name: Unit tests
+        run: npm test
 
       - name: Upload dist artifact
         if: matrix.os == 'ubuntu-latest'
