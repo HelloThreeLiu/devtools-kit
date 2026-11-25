@@ -16,6 +16,7 @@ import {
 import { copyText } from '../../utils/clipboard.js'
 import { recordHistory } from '../../utils/db.js'
 import { useReplay } from '../../utils/replay.js'
+import { consumeEnterPayload } from '../../router.js'
 
 const SAMPLE =
   '{"name":"devtools-kit","version":"1.0.0","description":"uTools 开发工具箱","tools":[{"id":"timestamp","p0":true},{"id":"base64","p0":true},{"id":"json","p0":true}],"meta":{"author":"HelloThreeLiu","stars":42,"active":true,"repo":null}}'
@@ -156,7 +157,8 @@ watch(effectiveInput, (v) => {
 })
 
 onMounted(() => {
-  input.value = SAMPLE
+  const p = consumeEnterPayload()
+  input.value = p ? String(p) : SAMPLE
   inputEl.value?.focus()
 })
 </script>

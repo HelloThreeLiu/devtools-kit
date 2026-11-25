@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
+  byteLen,
   computeFolds,
   formatJson,
   highlightJson,
   lint,
+  rootSummary,
 } from '../src/utils/convert/jsonFormat.js'
 
 const esc = (s) => s
@@ -115,6 +117,41 @@ describe('formatJson（PRD 4.3.4）', () => {
     const r = formatJson('{"a":1,}', '2')
     expect(r.ok).toBe(false)
     expect(r.line).toBe(1)
+  })
+})
+
+describe('性能与边界（PRD §5 性能指标）', () => {
+  test('1MB JSON 校验 + 格式化 ≤ 1 秒', () => {
+    const big = JSON.stringify({
+      items: Array.from({ length: 20000 }, (_, i) => ({
+        id: i,
+        name: `item-${i}`,
+        tags: ['a', 'b'],
+        meta: { ok: true, score: i * 0.5, desc: `描述文本 ${i}` },
+      })),
+    })
+    expect(byteLen(big)).toBeGreaterThan(1024 * 1024) // 确保用例本身超 1MB
+    const t0 = performance.now()
+    const r = formatJson(big, '2')
+    const dt = performance.now() - t0
+    expect(r.ok).toBe(true)
+    expect(dt).toBeLessThan(1000)
+  })
+
+  test('大 JSON 末尾缺失括号的定位', () => {
+    const big = JSON.stringify({ items: Array.from({ length: 5000 }, (_, i) => ({ id: i })) })
+    const broken = big.slice(0, -1) // 去掉最后的 }
+    const r = lint(broken)
+    expect(r.ok).toBe(false)
+    expect(r.reason).toContain('没有闭合')
+  })
+
+  test('空数组 / 空对象 / 纯标量', () => {
+    expect(formatJson('[]', '2').ok).toBe(true)
+    expect(formatJson('{}', '2').ok).toBe(true)
+    expect(formatJson('42', '2').ok).toBe(true)
+    expect(formatJson('"str"', '2').ok).toBe(true)
+    expect(formatJson('null', '2').ok).toBe(true)
   })
 })
 

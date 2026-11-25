@@ -9,8 +9,11 @@ import { toolByCode, MAIN_CODE } from './tools/index.js'
 
 export const route = ref('home')
 export const subInputText = ref('')
-/** 进入插件时携带的载荷（匹配指令进入时使用，M4 起） */
+/** 进入插件时携带的载荷（匹配指令进入时使用，技术设计 §5.2） */
 export const enterPayload = ref(null)
+
+/** 匹配指令带入的文本，工具挂载时通过 consumeEnterPayload() 一次性取走 */
+let pendingPayload = null
 
 let subInputActive = false
 
@@ -60,9 +63,25 @@ function focusToolInput() {
 /** onPluginEnter 分发（技术设计 §5.2） */
 export function handlePluginEnter(action) {
   enterPayload.value = action || null
-  const code = action && action.code
+  pendingPayload = null
   subInputText.value = ''
-  navigate(!code || code === MAIN_CODE || !toolByCode[code] ? 'home' : toolByCode[code].id)
+  const code = action && action.code
+  if (code && code !== MAIN_CODE && toolByCode[code]) {
+    // regex 匹配指令进入：携带匹配到的文本，工具挂载时预填（PRD 4.8.2）
+    if (action.type === 'regex' && typeof action.payload === 'string') {
+      pendingPayload = action.payload
+    }
+    navigate(toolByCode[code].id)
+  } else {
+    navigate('home')
+  }
+}
+
+/** 工具挂载时取走待预填的匹配文本（一次性） */
+export function consumeEnterPayload() {
+  const p = pendingPayload
+  pendingPayload = null
+  return p
 }
 
 /** onPluginOut 复位，等待下次进入 */

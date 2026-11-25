@@ -19,6 +19,7 @@ import {
 import { copyText } from '../../utils/clipboard.js'
 import { recordHistory } from '../../utils/db.js'
 import { useReplay } from '../../utils/replay.js'
+import { consumeEnterPayload } from '../../router.js'
 
 const input = ref('')
 const inputEl = ref(null)
@@ -97,7 +98,9 @@ function fmtToday() {
 }
 
 onMounted(() => {
-  fillToday()
+  const p = consumeEnterPayload()
+  if (p) input.value = String(p)
+  else fillToday()
   d1.value = fmtToday()
   inputEl.value?.focus()
 })

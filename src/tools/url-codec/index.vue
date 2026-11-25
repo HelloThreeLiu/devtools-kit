@@ -9,6 +9,7 @@ import { decodeUrl, encodeUrl, parseUrl } from '../../utils/convert/urlCodec.js'
 import { copyText } from '../../utils/clipboard.js'
 import { recordHistory } from '../../utils/db.js'
 import { useReplay } from '../../utils/replay.js'
+import { consumeEnterPayload } from '../../router.js'
 
 const input = ref('')
 const inputEl = ref(null)
@@ -45,7 +46,11 @@ const directionLabel = computed(() =>
   input.value ? (mode.value === 'decode' ? '解码' : '编码') : '—',
 )
 
-onMounted(() => inputEl.value?.focus())
+onMounted(() => {
+  const p = consumeEnterPayload()
+  if (p) input.value = String(p)
+  inputEl.value?.focus()
+})
 </script>
 
 <template>

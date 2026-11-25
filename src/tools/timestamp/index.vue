@@ -16,6 +16,7 @@ import {
 import { copyText } from '../../utils/clipboard.js'
 import { recordHistory } from '../../utils/db.js'
 import { useReplay } from '../../utils/replay.js'
+import { consumeEnterPayload } from '../../router.js'
 
 const input = ref('')
 const inputEl = ref(null)
@@ -101,9 +102,14 @@ function tick() {
 onMounted(() => {
   tick()
   timer = setInterval(tick, 1000)
-  // 呼起即聚焦，Ctrl+V 直接粘贴（PRD 4.2-3）
-  inputEl.value?.focus()
-  inputEl.value?.select()
+  // 匹配指令携载预填（PRD 4.8.2）
+  const p = consumeEnterPayload()
+  if (p) setInput(String(p))
+  else {
+    // 呼起即聚焦，Ctrl+V 直接粘贴（PRD 4.2-3）
+    inputEl.value?.focus()
+    inputEl.value?.select()
+  }
 })
 onUnmounted(() => {
   clearInterval(timer)

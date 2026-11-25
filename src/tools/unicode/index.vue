@@ -7,6 +7,7 @@ import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertUnicode } from '../../utils/convert/unicode.js'
 import { copyText } from '../../utils/clipboard.js'
+import { consumeEnterPayload } from '../../router.js'
 
 const input = ref('')
 const inputEl = ref(null)
@@ -38,7 +39,11 @@ const directionLabel = computed(() => {
   return res.value.direction === 'decode' ? '自动识别 → 解码' : '自动识别 → 编码'
 })
 
-onMounted(() => inputEl.value?.focus())
+onMounted(() => {
+  const p = consumeEnterPayload()
+  if (p) input.value = String(p)
+  inputEl.value?.focus()
+})
 </script>
 
 <template>
