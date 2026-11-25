@@ -32,7 +32,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # npm 的已知问题：单平台增量安装会把其它平台 optional 依赖的子树从
+        # lockfile 中裁剪掉，导致其它平台 npm ci 报 out-of-sync。
+        # fallback 到 npm install 自动补齐，保证三平台均可安装。
+        run: npm ci || npm install --no-fund --no-audit
 
       - name: Validate plugin.json
         run: node scripts/validate-plugin.mjs
