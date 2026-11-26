@@ -4,7 +4,7 @@
  * 自写校验器定位行:列 + 出错行摘录与定位动作；逐行渲染 + 节点折叠；
  * 超 5000 行截断显示，复制始终完整内容
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import {
   byteLen,
@@ -14,7 +14,9 @@ import {
   rootSummary,
 } from '../../utils/convert/jsonFormat.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { utools, inUtoolsEnv } from '../../utils/utools.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -38,10 +40,13 @@ const formats = [
   { id: 'min', label: '压缩' },
 ]
 
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：复制完整格式化内容（不受截断影响） */
+useMainResult(() => (output.value ? { value: output.value, label: '格式化结果' } : null))
+
 /* ---------- 校验与结果 ---------- */
 
 const result = computed(() => {
-  const src = input.value
+  const src = effectiveInput.value
   if (!src.trim()) return { empty: true }
   return formatJson(src, format.value)
 })
@@ -49,21 +54,25 @@ const result = computed(() => {
 const err = computed(() => (result.value.ok === false ? result.value : null))
 const output = computed(() => (result.value.ok ? result.value.data : ''))
 const lines = computed(() => (output.value ? output.value.split('\n') : []))
-const folds = computed(() => computeFolds(lines.value))
 const truncated = computed(() => lines.value.length > MAX_LINES)
+/** 实际渲染的行（超长截断，复制始终用完整 output） */
+const shown = computed(() => (truncated.value ? lines.value.slice(0, MAX_LINES) : lines.value))
+// 折叠区间基于「渲染行」计算：闭合行在截断边界之外的节点不可折叠，
+// 避免渲染 undefined（此前为崩溃源，见 docs/修复记录.md）
+const folds = computed(() => computeFolds(shown.value))
 
 /** 渲染行模型：折叠行内联为「… N 行」标记 */
 const renderRows = computed(() => {
   const rows = []
-  const shown = truncated.value ? lines.value.slice(0, MAX_LINES) : lines.value
-  const single = shown.length === 1
-  for (let i = 0; i < shown.length; i++) {
+  const shownLines = shown.value
+  const single = shownLines.length === 1
+  for (let i = 0; i < shownLines.length; i++) {
     const isOpen = !single && folds.value.has(i)
     const folded = isOpen && collapsed.value.has(i)
-    let code = highlightJson(shown[i])
+    let code = highlightJson(shownLines[i])
     if (folded) {
       const close = folds.value.get(i)
-      code += `<span class="fold-mark">… ${close - i - 1} 行</span><span class="ln-code-bracket">${highlightJson(shown[close].trim())}</span>`
+      code += `<span class="fold-mark">… ${close - i - 1} 行</span><span class="ln-code-bracket">${highlightJson(shownLines[close].trim())}</span>`
       i = close
     }
     rows.push({ no: i + 1, code, foldable: isOpen, folded })
@@ -110,7 +119,7 @@ function clearInput() {
   inputEl.value?.focus()
 }
 
-/* 大输入 debounce（技术设计 §12） */
+/* 大输入 debounce（技术设计 §12）：渲染链（result）经 effectiveInput 消费防抖后的值 */
 let timer = null
 const debouncedInput = ref('')
 watch(input, (v) => {
@@ -146,20 +155,44 @@ watch(effectiveInput, () => {
   collapsed.value = new Set()
 })
 
-/* 历史记录：合法 JSON 停顿 1s 后写入（PRD 4.7.1） */
-let histTimer = null
-watch(effectiveInput, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = formatJson(v, format.value)
-    if (r.ok) recordHistory('json', v, r.data)
-  }, 1000)
+/* 历史记录：合法 JSON 停顿 1s 后写入（PRD 4.7.1，卸载自动清理） */
+useHistRecorder('json', effectiveInput, (v) => {
+  const r = formatJson(v, format.value)
+  return r.ok ? r.data : null
 })
+
+/* 大内容增高窗口（技术设计 §4：JSON 按需 setExpandHeight(600)，恢复默认 544） */
+let expanded = false
+watch(
+  () => lines.value.length,
+  (n) => {
+    if (!inUtoolsEnv || typeof utools.setExpandHeight !== 'function') return
+    const need = n > 20
+    if (need === expanded) return
+    expanded = need
+    try {
+      utools.setExpandHeight(need ? 600 : 544)
+    } catch (e) {
+      expanded = !need // 自定义窗口等场景不支持，回滚状态
+    }
+  },
+)
 
 onMounted(() => {
   const p = consumeEnterPayload()
   input.value = p ? String(p) : SAMPLE
   inputEl.value?.focus()
+})
+
+onUnmounted(() => {
+  clearTimeout(timer)
+  if (expanded) {
+    try {
+      utools.setExpandHeight(544)
+    } catch (e) {
+      /* 忽略 */
+    }
+  }
 })
 </script>
 
