@@ -3,7 +3,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "check": "node scripts/validate-plugin.mjs && npm run build && node scripts/check-dist.mjs"
+    "audit": "node scripts/check-imports.js && node scripts/check-payload-hooks.js && node scripts/check-css-classes.js && node scripts/check-match-regex.mjs",
+    "check": "node scripts/validate-plugin.mjs && npm run audit && npm run build && node scripts/check-dist.mjs"
   },
   "dependencies": {
     "qrcode": "^1.5.4",

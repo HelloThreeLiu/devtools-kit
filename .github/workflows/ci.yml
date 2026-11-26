@@ -40,6 +40,9 @@ jobs:
       - name: Validate plugin.json
         run: node scripts/validate-plugin.mjs
 
+      - name: Static audits (imports / payload hooks / css classes / match regex)
+        run: npm run audit
+
       - name: Build (vite)
         run: npm run build
 
