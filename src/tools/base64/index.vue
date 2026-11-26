@@ -3,11 +3,12 @@
  * Base64 编解码（PRD 4.3.2）
  * 自动识别方向；UTF-8 安全；URL-Safe 容错；非法输入行内报错
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertBase64 } from '../../utils/convert/base64.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -17,14 +18,14 @@ const mode = ref('auto') // auto | encode | decode
 
 useReplay('base64', (v) => (input.value = String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = convertBase64(v, mode.value)
-    if (r.ok) recordHistory('base64', v, r.data)
-  }, 1000)
+/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
+useHistRecorder('base64', input, (v) => {
+  const r = convertBase64(v, mode.value)
+  return r.ok ? r.data : null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2） */
+useMainResult(() => (out.value ? { value: out.value, label: 'Base64 结果' } : null))
 
 const modes = [
   { id: 'auto', label: '自动识别' },
@@ -107,7 +108,14 @@ onMounted(() => {
       </div>
       <div class="pane pane--text">
         <div class="pane-scroll">
-          <span v-if="!input" class="placeholder">输入内容后自动转换。</span>
+          <div v-if="!input" class="placeholder">
+            输入内容后自动转换。
+            <div class="examples">
+              <button v-for="x in ['hello', '你好', 'aGVsbG8=']" :key="x" type="button" class="example" @click="input = x">
+                {{ x }}
+              </button>
+            </div>
+          </div>
           <span v-else-if="err">—</span>
           <template v-else>{{ out }}</template>
         </div>

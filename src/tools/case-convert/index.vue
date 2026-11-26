@@ -3,11 +3,12 @@
  * 命名风格转换（PRD 4.5.2）
  * 任意风格输入 → 五种命名风格并行输出
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertNaming } from '../../utils/convert/naming.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -16,14 +17,14 @@ const inputEl = ref(null)
 
 useReplay('case-convert', (v) => (input.value = String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = convertNaming(v)
-    if (r.camel) recordHistory('case-convert', v, r.camel)
-  }, 1000)
+/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
+useHistRecorder('case-convert', input, (v) => {
+  const r = convertNaming(v)
+  return r.camel || null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：camelCase */
+useMainResult(() => (res.value.camel ? { value: res.value.camel, label: 'camelCase' } : null))
 
 const res = computed(() => convertNaming(input.value))
 
@@ -64,7 +65,7 @@ onMounted(() => {
           autocomplete="off"
           spellcheck="false"
         />
-        <button v-show="input" type="button" class="input-clear" aria-label="清空" title="清空" @click="input = ''">
+        <button v-show="input" type="button" class="input-clear" aria-label="清空" title="清空" @click="input = ''; inputEl?.focus()">
           <Icon name="x" size="sm" />
         </button>
       </div>

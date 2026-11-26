@@ -3,11 +3,12 @@
  * Unicode 转中文（PRD 4.3.7）
  * \uXXXX / \u{...} / &#xHHHH; 解码；非 ASCII → \uXXXX 编码；自动识别方向
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertUnicode } from '../../utils/convert/unicode.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -23,14 +24,14 @@ const modes = [
 
 useReplay('unicode', (v) => (input.value = String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = convertUnicode(v, mode.value)
-    if (r.ok) recordHistory('unicode', v, r.data)
-  }, 1000)
+/* 历史记录：停顿 1s 后写入（卸载自动清理） */
+useHistRecorder('unicode', input, (v) => {
+  const r = convertUnicode(v, mode.value)
+  return r.ok ? r.data : null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2） */
+useMainResult(() => (out.value ? { value: out.value, label: '结果' } : null))
 
 const res = computed(() => convertUnicode(input.value, mode.value))
 const out = computed(() => (res.value.ok ? res.value.data : ''))

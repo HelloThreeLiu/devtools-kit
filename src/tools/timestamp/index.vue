@@ -3,7 +3,7 @@
  * 时间戳转换（PRD 4.3.1 v0.3 / 技术设计 §11.1）
  * 单输入框方向自动识别；转换逻辑全部在 utils/convert/timestamp.js 纯函数中
  */
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import {
   analyze,
@@ -14,7 +14,8 @@ import {
   zoneLabel,
 } from '../../utils/convert/timestamp.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -26,15 +27,14 @@ const zone = zoneLabel()
 /* 历史回填：点击历史记录后回到本工具并恢复输入 */
 useReplay('timestamp', (v) => setInput(String(v ?? '')))
 
-/* 历史记录：有效结果停顿 1s 后写入（PRD 4.7.1） */
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = analyze(v)
-    if (r.kind === 'ts' || r.kind === 'date') recordHistory('timestamp', v, fmtLocal(new Date(r.ms)))
-  }, 1000)
+/* 历史记录：有效结果停顿 1s 后写入（PRD 4.7.1，卸载自动清理） */
+useHistRecorder('timestamp', input, (v) => {
+  const r = analyze(v)
+  return r.kind === 'ts' || r.kind === 'date' ? fmtLocal(new Date(r.ms)) : null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：时间戳 → 本地时间，日期 → 秒级时间戳 */
+useMainResult(() => (mainValue.value ? { value: mainValue.value, label: mainLabel.value } : null))
 
 const res = computed(() => analyze(input.value))
 const isValue = computed(() => res.value.kind === 'ts' || res.value.kind === 'date')
@@ -78,14 +78,6 @@ function onCopy(key) {
   copyText(values.value[key], { local: '本地时间', utc: 'UTC 时间', iso: 'ISO 8601', sec: '秒级时间戳', ms: '毫秒级时间戳', rel: '相对时间' }[key])
 }
 
-function onKeydown(e) {
-  // Ctrl+Enter 复制主结果（PRD 4.2-2）：时间戳 → 本地时间，日期 → 秒级时间戳
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && mainValue.value) {
-    e.preventDefault()
-    copyText(mainValue.value, mainLabel.value)
-  }
-}
-
 /* ---------- 当前时间戳实时条（每秒刷新，卸载清理） ---------- */
 
 const nowSec = ref('')
@@ -113,12 +105,11 @@ onMounted(() => {
 })
 onUnmounted(() => {
   clearInterval(timer)
-  clearTimeout(histTimer)
 })
 </script>
 
 <template>
-  <div class="tool-body" @keydown="onKeydown">
+  <div class="tool-body">
     <!-- 输入区：时间戳与日期自动识别方向，无需切换模式 -->
     <div class="block">
       <div class="block-head">
@@ -182,7 +173,7 @@ onUnmounted(() => {
             </button>
           </div>
           <div class="hero" :class="{ 'hero--source': res.kind === 'ts' && res.unit === '毫秒' }">
-            <small>毫秒级 <span v-if="res.kind === 'ts' && res.unit !== '秒'" class="tag">输入</span></small>
+            <small>毫秒级 <span v-if="res.kind === 'ts' && res.unit === '毫秒'" class="tag">输入</span></small>
             <code>{{ values.ms }}</code>
             <button type="button" class="icon-btn" aria-label="复制毫秒级时间戳" title="复制毫秒级时间戳" @click="onCopy('ms')">
               <Icon name="copy" size="sm" />

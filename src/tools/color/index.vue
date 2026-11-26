@@ -3,11 +3,12 @@
  * 颜色格式转换（PRD 4.6.1）
  * HEX / RGB / HSL 互转 + alpha + 预览色块 + CSS 变量代码片段
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { formatColor, parseColor } from '../../utils/convert/color.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -16,26 +17,26 @@ const inputEl = ref(null)
 
 useReplay('color', (v) => (input.value = String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = parseColor(v)
-    if (r.ok) recordHistory('color', v, formatColor(r.color).hex)
-  }, 1000)
+/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
+useHistRecorder('color', input, (v) => {
+  const r = parseColor(v)
+  return r.ok ? formatColor(r.color).hex : null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：HEX */
+useMainResult(() => (fmt.value ? { value: fmt.value.hex, label: 'HEX' } : null))
 
 const res = computed(() => parseColor(input.value))
 const fmt = computed(() => (res.value.ok ? formatColor(res.value.color) : null))
 const err = computed(() => res.value.error || '')
 
-const swatchStyle = computed(() => {
-  if (!fmt.value) return { background: 'var(--surface-2)' }
-  const { r, g, b, a } = res.value.color
-  return a < 1
-    ? { background: `linear-gradient(45deg, rgba(${r},${g},${b},${a}) 50%, rgba(${r},${g},${b},0.25) 50%)` }
-    : { background: `rgb(${r}, ${g}, ${b})` }
-})
+/* ---------- 拾色器（PRD 4.6.1：点击弹出系统颜色选择） ---------- */
+// type=color 只接受 #rrggbb；带 alpha 时取不透明部分用于回显
+const pickerHex = computed(() => (fmt.value ? fmt.value.hex.slice(0, 7) : '#1e80ff'))
+
+function onPick(e) {
+  input.value = e.target.value // #rrggbb，parseColor 可直接解析
+}
 
 const rows = computed(() => {
   if (!fmt.value) return []
@@ -76,7 +77,14 @@ onMounted(() => {
             aria-describedby="colorErr"
           />
         </div>
-        <div class="swatch" :style="swatchStyle" :title="fmt ? fmt.hex : '预览'"></div>
+        <input
+          type="color"
+          class="swatch"
+          :value="pickerHex"
+          title="拾色器：点击弹出颜色选择"
+          aria-label="拾色器"
+          @input="onPick"
+        />
       </div>
       <div id="colorErr" class="alert" :hidden="!err" role="alert">
         <Icon name="alert" />
@@ -112,11 +120,22 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 拾色器：input[type=color] 即预览色块，点击弹系统颜色选择 */
 .swatch {
   flex: none;
   width: var(--h-input);
   height: var(--h-input);
+  padding: 0;
   border: 1px solid var(--border-control);
   border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+}
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: inherit;
 }
 </style>

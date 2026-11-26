@@ -10,8 +10,12 @@ import { toolById } from '../tools/index.js'
 import { favorites, toggleFavorite, listHistory, removeHistory, clearHistory } from '../utils/db.js'
 import { navigate } from '../router.js'
 import { replay } from '../utils/replay.js'
+import { useMainResultKey } from '../utils/mainResult.js'
 import { relTime } from '../utils/convert/timestamp.js'
 import { toast } from '../utils/toast.js'
+
+// Ctrl/Cmd + Enter 复制工具主结果（PRD 4.2-2）：document 级监听，随本组件卸载移除
+useMainResultKey()
 
 const props = defineProps({
   toolId: { type: String, required: true },

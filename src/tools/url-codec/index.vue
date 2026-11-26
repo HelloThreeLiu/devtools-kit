@@ -3,11 +3,12 @@
  * URL 编解码（PRD 4.3.3）
  * 解码 / Component 编码 / URI 编码；完整 URL 额外给出结构化解析
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { decodeUrl, encodeUrl, parseUrl } from '../../utils/convert/urlCodec.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -17,15 +18,14 @@ const mode = ref('decode') // decode | component | uri
 
 useReplay('url-codec', (v) => (input.value = String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    if (!v) return
-    const r = mode.value === 'decode' ? decodeUrl(v) : encodeUrl(v, mode.value)
-    if (r.ok) recordHistory('url-codec', v, r.data)
-  }, 1000)
+/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
+useHistRecorder('url-codec', input, (v) => {
+  const r = mode.value === 'decode' ? decodeUrl(v) : encodeUrl(v, mode.value)
+  return r.ok ? r.data : null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2） */
+useMainResult(() => (out.value ? { value: out.value, label: '结果' } : null))
 
 const modes = [
   { id: 'decode', label: '解码' },
@@ -99,7 +99,20 @@ onMounted(() => {
       </div>
       <div class="pane pane--text">
         <div class="pane-scroll">
-          <span v-if="!input" class="placeholder">输入内容后自动转换。</span>
+          <div v-if="!input" class="placeholder">
+            输入内容后自动转换。
+            <div class="examples">
+              <button
+                v-for="x in ['https://a.com/?kw=你好', '%E4%BD%A0%E5%A5%BD']"
+                :key="x"
+                type="button"
+                class="example"
+                @click="input = x"
+              >
+                {{ x }}
+              </button>
+            </div>
+          </div>
           <span v-else-if="err">—</span>
           <template v-else>{{ out }}</template>
         </div>
@@ -125,7 +138,7 @@ onMounted(() => {
         <span class="k">锚点</span><span class="v">{{ parsed.hash }}</span>
       </div>
       <template v-if="parsed.params.length">
-        <div v-for="[k, v] in parsed.params" :key="k + v" class="kv">
+        <div v-for="([k, v], idx) in parsed.params" :key="`${k}=${v}#${idx}`" class="kv">
           <span class="k">{{ k }}</span>
           <span class="v">{{ v }}</span>
           <button type="button" class="icon-btn" :aria-label="`复制参数 ${k}`" title="复制参数值" @click="copyText(v, k)">

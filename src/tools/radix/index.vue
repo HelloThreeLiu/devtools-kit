@@ -3,11 +3,12 @@
  * 进制转换（PRD 4.3.5）
  * 2/8/10/16 进制互转；0b/0o/0x 前缀自动识别；BigInt 大数安全；36 进制只读输出
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { convertRadix } from '../../utils/convert/radix.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -17,14 +18,14 @@ const base = ref('auto') // 'auto' | 2 | 8 | 10 | 16
 
 useReplay('radix', (v) => setInput(String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    const r = convertRadix(v, base.value === 'auto' ? 10 : base.value)
-    if (r.ok) recordHistory('radix', v, r.outputs.dec)
-  }, 1000)
+/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
+useHistRecorder('radix', input, (v) => {
+  const r = convertRadix(v, base.value === 'auto' ? 10 : base.value)
+  return r.ok ? r.outputs.dec : null
 })
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：十进制结果 */
+useMainResult(() => (res.value.ok ? { value: res.value.outputs.dec, label: '十进制' } : null))
 
 const bases = [
   { id: 'auto', label: '自动' },

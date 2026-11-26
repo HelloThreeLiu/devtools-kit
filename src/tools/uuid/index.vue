@@ -5,8 +5,9 @@
  */
 import { computed, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
-import { generateUuids } from '../../utils/convert/uuid.js'
+import { formatUuid, generateUuids } from '../../utils/convert/uuid.js'
 import { copyText } from '../../utils/clipboard.js'
+import { useMainResult } from '../../utils/mainResult.js'
 
 const count = ref(5)
 const format = ref('standard') // standard | none | upper
@@ -17,7 +18,11 @@ const formats = [
   { id: 'upper', label: '大写' },
 ]
 
-const list = ref(generateUuids(count.value, format.value))
+/** 原始批次（标准小写形态）——切换展示格式只重排显示，不重新生成（PRD 4.5.1「展示格式切换」） */
+const rawList = ref(generateUuids(count.value))
+
+/** 展示列表：对同一批 UUID 应用当前格式 */
+const list = computed(() => rawList.value.map((u) => formatUuid(u, format.value)))
 
 const clampCount = () => {
   const n = Math.floor(Number(count.value) || 1)
@@ -26,15 +31,18 @@ const clampCount = () => {
 }
 
 function regenerate() {
-  list.value = generateUuids(count.value, format.value)
+  rawList.value = generateUuids(count.value)
 }
 
+/** 切换展示格式：仅重映射当前批次，不产生新随机值 */
 function setFormat(id) {
   format.value = id
-  regenerate()
 }
 
 const allText = computed(() => list.value.join('\n'))
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：全部 UUID */
+useMainResult(() => ({ value: allText.value, label: '全部 UUID' }))
 
 function onCopyRow(u, i) {
   copyText(u, `第 ${i + 1} 个`)
@@ -87,7 +95,7 @@ function onCopyRow(u, i) {
       </div>
       <div class="pane">
         <div class="pane-scroll">
-          <div v-for="(u, i) in list" :key="u" class="urow">
+          <div v-for="(u, i) in list" :key="i" class="urow">
             <span class="urow-no" aria-hidden="true">{{ i + 1 }}</span>
             <code>{{ u }}</code>
             <button

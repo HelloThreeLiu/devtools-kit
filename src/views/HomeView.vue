@@ -171,6 +171,16 @@ function onSearchEnter() {
               <Icon :name="x.t.icon" />
               <span class="name">{{ x.t.name }}</span>
             </button>
+            <button
+              type="button"
+              class="icon-btn star"
+              :aria-pressed="favorites.includes(x.t.id)"
+              :aria-label="(favorites.includes(x.t.id) ? '取消收藏 ' : '收藏 ') + x.t.name"
+              :title="favorites.includes(x.t.id) ? '取消收藏' : '收藏'"
+              @click.stop="onFav(x.t)"
+            >
+              <Icon name="star" size="sm" />
+            </button>
           </li>
         </ul>
       </div>

@@ -8,7 +8,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { services } from '../../utils/utools.js'
 import { copyText } from '../../utils/clipboard.js'
-import { recordHistory } from '../../utils/db.js'
+import { useHistRecorder } from '../../utils/histRecorder.js'
+import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
@@ -19,15 +20,19 @@ const loading = ref(false)
 const hashes = ref({ md5: '', sha1: '', sha256: '', sha512: '' })
 let seq = 0 // 防止慢请求晚到覆盖新结果
 
+// preload 加载失败时 services 为空对象（utils/utools.js 兜底），此处显式防御
+const hashAvailable = () => typeof services.hash === 'function'
+
 useReplay('hash', (v) => (input.value = String(v ?? '')))
 
-let histTimer = null
-watch(input, (v) => {
-  clearTimeout(histTimer)
-  histTimer = setTimeout(() => {
-    if (v) services.hash(v, 'md5').then((h) => recordHistory('hash', v, `md5: ${h}`)).catch(() => {})
-  }, 1000)
-})
+/* 历史记录：停顿 1s 后记录 md5 摘要（卸载自动清理；服务不可用时抛错由 recorder 静默跳过） */
+useHistRecorder('hash', input, async (v) => 'md5: ' + (await services.hash(v, 'md5')))
+
+/* Ctrl+Enter 复制主结果（PRD 4.2-2）：四种摘要全文 */
+const allDigests = computed(() => rows.value.map((r) => `${r.k}: ${r.v}`).join('\n'))
+useMainResult(() =>
+  input.value && !loading.value && hashes.value.md5 ? { value: allDigests.value, label: '全部摘要' } : null,
+)
 
 const rows = computed(() => {
   const c = upper.value
@@ -50,6 +55,12 @@ async function run() {
   }
   loading.value = true
   const algos = ['md5', 'sha1', 'sha256', 'sha512']
+  if (!hashAvailable()) {
+    if (my !== seq) return
+    hashes.value = { md5: '不可用', sha1: '不可用', sha256: '不可用', sha512: '不可用' }
+    loading.value = false
+    return
+  }
   const settled = await Promise.allSettled(algos.map((a) => services.hash(text, a)))
   if (my !== seq) return // 已有更新的输入
   const next = {}
@@ -96,8 +107,16 @@ onMounted(() => {
         <span>摘要结果</span>
         <span v-if="loading" class="tag">计算中…</span>
         <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" :disabled="!hashes.md5" @click="copyText(allDigests, '全部摘要')">
+          <Icon name="copy" size="sm" />复制全部
+        </button>
       </div>
-      <div v-if="!input" class="panel-empty">输入文本后自动计算 MD5 / SHA-1 / SHA-256 / SHA-512。</div>
+      <div v-if="!input" class="panel-empty">
+        输入文本后自动计算 MD5 / SHA-1 / SHA-256 / SHA-512。
+        <div class="examples">
+          <button type="button" class="example" @click="input = 'abc'">abc</button>
+        </div>
+      </div>
       <template v-else>
         <div v-for="r in rows" :key="r.key" class="kv">
           <span class="k">{{ r.k }}</span>
