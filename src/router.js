@@ -5,7 +5,8 @@
  */
 import { ref, computed } from 'vue'
 import { utools, inUtoolsEnv } from './utils/utools.js'
-import { toolByCode, MAIN_CODE } from './tools/index.js'
+import { toolByCode, toolById, MAIN_CODE } from './tools/index.js'
+import { replay } from './utils/replay.js'
 
 export const route = ref('home')
 export const subInputText = ref('')
@@ -71,7 +72,14 @@ export function handlePluginEnter(action) {
     if (action.type === 'regex' && typeof action.payload === 'string') {
       pendingPayload = action.payload
     }
-    navigate(toolByCode[code].id)
+    const id = toolByCode[code].id
+    if (route.value === id && pendingPayload) {
+      // 已处于该工具页：组件不会重挂载、onMounted 不会重跑，
+      // 直接回填避免 payload 残留（否则会污染下一次进入其他工具时的预填）
+      replay(id, consumeEnterPayload())
+    } else {
+      navigate(id)
+    }
   } else {
     navigate('home')
   }
@@ -91,5 +99,5 @@ export function handlePluginOut() {
   route.value = 'home'
 }
 
-/** 当前工具对象（route 为工具 id 时） */
-export const currentTool = computed(() => (route.value === 'home' ? null : toolByCode[route.value] || null))
+/** 当前工具对象（route 为工具 id 时；注意按 id 查 toolById，非 toolByCode） */
+export const currentTool = computed(() => (route.value === 'home' ? null : toolById[route.value] || null))
