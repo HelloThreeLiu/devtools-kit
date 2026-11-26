@@ -31,6 +31,9 @@ npm run check   # plugin.json 合规校验 + 构建 + dist 插件结构校验
 | [docs/PRD.md](docs/PRD.md) | 产品需求文档（含验收标准与迭代规划） |
 | [docs/技术设计.md](docs/技术设计.md) | 技术方案（架构 / 路由 / 数据层 / 实现要点） |
 | [docs/设计令牌.md](docs/设计令牌.md) | UI 设计令牌规范（**所有 UI 改动必须遵循**） |
+| [docs/代码审查报告.md](docs/代码审查报告.md) | 全量代码审查报告（2026-11-26，含 PRD 对照矩阵） |
+| [docs/修复记录.md](docs/修复记录.md) | 审查问题修复记录（含验证结果与文件清单） |
+| [docs/测试清单.md](docs/测试清单.md) | M5 测试走查清单（uTools 真机逐条走查） |
 | [docs/prototype/index.html](docs/prototype/index.html) | 高保真可交互原型（浏览器直接打开审阅） |
 
 ## CI
