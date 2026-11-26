@@ -62,4 +62,18 @@ describe('自动识别（PRD 4.3.2）', () => {
     expect(looksLikeB64('abc')).toBe(false) // <4 位
     expect(looksLikeB64('a')).toBe(false)
   })
+
+  test('auto：形似 Base64 但解码失败且为纯字母数字 → 回退为编码（如 test / user）', () => {
+    const r = convertBase64('test', 'auto')
+    expect(r.ok).toBe(true)
+    expect(r.direction).toBe('encode')
+    expect(decodeB64(r.data).data).toBe('test')
+    expect(convertBase64('user', 'auto').direction).toBe('encode')
+  })
+
+  test('auto：含 Base64 特征字符的损坏内容仍保留解码错误', () => {
+    const r = convertBase64('+abc', 'auto') // 字符集合法但非合法 UTF-8 结果，含 + 不回退
+    expect(r.direction).toBe('decode')
+    expect(r.ok).toBe(false)
+  })
 })

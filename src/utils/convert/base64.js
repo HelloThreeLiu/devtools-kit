@@ -75,7 +75,16 @@ export function decodeB64(str) {
 export function convertBase64(str, mode = 'auto') {
   const s = String(str ?? '')
   if (!s) return { ok: false, empty: true }
-  const dir = mode === 'auto' ? (looksLikeB64(s) ? 'decode' : 'encode') : mode
-  const r = dir === 'decode' ? decodeB64(s) : encodeB64(s)
-  return { ...r, direction: dir }
+  if (mode === 'auto') {
+    if (looksLikeB64(s)) {
+      const r = decodeB64(s)
+      // 形似 Base64 但解码失败、且内容为纯字母数字（无 + / = - _ 特征字符）：
+      // 大概率是普通单词（如 test / user / data）而非损坏的 Base64，回退为编码
+      if (!r.ok && /^[A-Za-z0-9]+$/.test(s.trim())) return { ...encodeB64(s), direction: 'encode' }
+      return { ...r, direction: 'decode' }
+    }
+    return { ...encodeB64(s), direction: 'encode' }
+  }
+  const r = mode === 'decode' ? decodeB64(s) : encodeB64(s)
+  return { ...r, direction: mode }
 }

@@ -6,6 +6,7 @@ import {
   isoWeek,
   lunar,
   parseDateYMD,
+  workdayDiff,
 } from '../src/utils/convert/dateCalc.js'
 
 /** 春节（正月初一）公历日期表——公开常识数据，作为农历对拍基准（PRD 4.4.1 验收） */
@@ -95,5 +96,38 @@ describe('日期解析（PRD 4.2-4）', () => {
     expect(parseDateYMD('2025-02-30')).toBeNull()
     expect(parseDateYMD('2025-13-01')).toBeNull()
     expect(parseDateYMD('abc')).toBeNull()
+  })
+})
+
+describe('工作日天数（PRD 4.4.1 可选 P1，剔除周六日，含头含尾）', () => {
+  const d = (s) => {
+    const [y, m, dd] = s.split('-').map(Number)
+    return new Date(y, m - 1, dd)
+  }
+
+  test('周一到周五 = 5', () => {
+    expect(workdayDiff(d('2025-01-06'), d('2025-01-10'))).toBe(5) // 2025-01-06 为周一
+  })
+
+  test('顺序无关', () => {
+    expect(workdayDiff(d('2025-01-10'), d('2025-01-06'))).toBe(5)
+  })
+
+  test('纯周末 = 0', () => {
+    expect(workdayDiff(d('2025-01-11'), d('2025-01-12'))).toBe(0) // 周六 ~ 周日
+  })
+
+  test('跨周周一到周日 = 5', () => {
+    expect(workdayDiff(d('2025-01-06'), d('2025-01-12'))).toBe(5)
+  })
+
+  test('单日：工作日为 1，周末为 0', () => {
+    expect(workdayDiff(d('2025-01-06'), d('2025-01-06'))).toBe(1)
+    expect(workdayDiff(d('2025-01-11'), d('2025-01-11'))).toBe(0)
+  })
+
+  test('与自然日差自洽：2025-01（周三起，31 天无周末重叠）', () => {
+    expect(dayDiff(d('2025-01-01'), d('2025-01-31'))).toBe(30)
+    expect(workdayDiff(d('2025-01-01'), d('2025-01-31'))).toBe(23) // 2025-01 共 8 个周末日
   })
 })

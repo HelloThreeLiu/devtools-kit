@@ -64,6 +64,22 @@ export function dayDiff(a, b) {
   return Math.round((ub - ua) / 86400000)
 }
 
+/**
+ * 工作日天数（剔除周六日，PRD 4.4.1 可选 P1）：[a, b] 含头含尾，顺序无关
+ * @returns {number} 区间内的工作日天数（非负）
+ */
+export function workdayDiff(a, b) {
+  const [s, e] = a.getTime() <= b.getTime() ? [a, b] : [b, a]
+  const su = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())
+  const total = Math.round((Date.UTC(e.getFullYear(), e.getMonth(), e.getDate()) - su) / 86400000) + 1
+  let count = 0
+  for (let i = 0; i < total; i++) {
+    const dow = new Date(su + i * 86400000).getUTCDay()
+    if (dow !== 0 && dow !== 6) count++
+  }
+  return count
+}
+
 let chineseFormatter = null
 try {
   chineseFormatter = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', {
