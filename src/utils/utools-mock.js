@@ -70,6 +70,14 @@ const mock = {
     removeItem: (k) => memory.removeItem(k),
   },
 
+  /* ---- 屏幕取色（浏览器里降级为 EyeDropper API，仅 Chrome/Edge 支持）---- */
+  screenColorPick() {
+    if (typeof window === 'undefined' || !window.EyeDropper) {
+      return Promise.reject(new DOMException('EyeDropper unsupported', 'NotSupportedError'))
+    }
+    return new window.EyeDropper().open().then((r) => ({ hex: r.sRGBHex, rgb: '' }))
+  },
+
   /* ---- 其他 ---- */
   isDarkColors: () => false,
   isMacOS: () => false,

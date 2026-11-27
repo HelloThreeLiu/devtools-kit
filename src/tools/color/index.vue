@@ -7,6 +7,7 @@ import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
 import { formatColor, parseColor } from '../../utils/convert/color.js'
 import { copyText } from '../../utils/clipboard.js'
+import { utools, inUtoolsEnv } from '../../utils/utools.js'
 import { useHistRecorder } from '../../utils/histRecorder.js'
 import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
@@ -36,6 +37,29 @@ const pickerHex = computed(() => (fmt.value ? fmt.value.hex.slice(0, 7) : '#1e80
 
 function onPick(e) {
   input.value = e.target.value // #rrggbb，parseColor 可直接解析
+}
+
+/* ---------- 屏幕取色（uTools 全屏吸管；浏览器调试降级 EyeDropper API） ---------- */
+// uTools：宿主提供全屏取色模式；浏览器：仅 Chrome/Edge 支持 EyeDropper
+const pickSupported = inUtoolsEnv
+  ? typeof utools.screenColorPick === 'function'
+  : typeof window !== 'undefined' && typeof window.EyeDropper === 'function'
+const picking = ref(false)
+
+async function pickFromScreen() {
+  if (!pickSupported || picking.value) return
+  picking.value = true
+  try {
+    const c = await utools.screenColorPick()
+    if (c?.hex) {
+      input.value = c.hex // #rrggbb，parseColor 可直接解析
+      inputEl.value?.focus()
+    }
+  } catch {
+    /* 用户取消（Esc）→ 静默 */
+  } finally {
+    picking.value = false
+  }
 }
 
 const rows = computed(() => {
@@ -77,6 +101,17 @@ onMounted(() => {
             aria-describedby="colorErr"
           />
         </div>
+        <button
+          type="button"
+          class="btn"
+          :disabled="!pickSupported || picking"
+          title="屏幕取色：吸取屏幕任意位置的颜色"
+          aria-label="屏幕取色"
+          @click="pickFromScreen"
+        >
+          <Icon name="pipette" size="sm" />
+          {{ picking ? '取色中…' : '屏幕取色' }}
+        </button>
         <input
           type="color"
           class="swatch"
