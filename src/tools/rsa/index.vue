@@ -1,9 +1,10 @@
 <script setup>
 /**
  * RSA 加解密（R2.8）
- * 密钥对生成（2048/4096，SPKI/PKCS#8 PEM）· 私钥提取公钥
- * 公钥：加密（OAEP-SHA256 默认 / PKCS#1 v1.5）· 验签（SHA-256 / SHA-1）
- * 私钥：解密 · 签名；粘贴 PEM 即时校验并给出具体原因
+ * 按任务动线分五个步骤区：① 密钥（生成/粘贴）→ ② 加密（公钥）→ ③ 解密（私钥）
+ * → ④ 签名（私钥）→ ⑤ 验签（公钥）。
+ * 密钥对生成（2048/4096，SPKI/PKCS#8 PEM）· 加密填充 OAEP-SHA256 / PKCS#1 v1.5
+ * · 签名哈希 SHA-256 / SHA-1 · 粘贴 PEM 即时校验并给出具体原因
  * 运算在 preload（node:crypto，uTools）或 mock（WebCrypto，浏览器调试）中执行
  */
 import { computed, onMounted, ref, watch } from 'vue'
@@ -17,9 +18,7 @@ import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
-/* ---------- 宿主能力（浏览器调试隐藏入口） ---------- */
-
-/* preload 版本探测：RSA 六个动作是 v1.2 批次新增，旧装载的 preload 不含（W4：给出生效指引而非裸错误） */
+/* preload 版本探测：RSA 六个动作是 v1.2 批次新增，旧装载的 preload 不含（给出生效指引而非裸错误） */
 const rsaReady =
   typeof services.rsaGenerateKeyPair === 'function' &&
   typeof services.rsaExtractPublic === 'function' &&
@@ -30,12 +29,30 @@ const rsaReady =
 const PRELOAD_STALE_MSG =
   '当前装载的 preload 版本不含 RSA 能力：请在 uTools 开发者模式下重新安装本插件（或重启 uTools）后重试——修改 preload.js 需重新装载才生效'
 
-/* ---------- 密钥对 ---------- */
+/* ---------- ① 密钥 ---------- */
 
 const keyBits = ref(2048)
 const generating = ref(false)
-const keyPair = ref(null) // { publicKey, privateKey }
+const pubPem = ref('')
+const priPem = ref('')
+const pubErr = computed(() => {
+  const r = validatePem(pubPem.value, 'public')
+  return r.ok ? '' : r.error
+})
+const priErr = computed(() => {
+  const r = validatePem(priPem.value, 'private')
+  return r.ok ? '' : r.error
+})
+const pubStatusText = computed(() => {
+  if (!pubPem.value.trim()) return '未就绪 · 粘贴或生成'
+  return pubErr.value ? '格式有误' : '就绪 ✓'
+})
+const priStatusText = computed(() => {
+  if (!priPem.value.trim()) return '未就绪 · 粘贴或生成'
+  return priErr.value ? '格式有误' : '就绪 ✓'
+})
 
+let generatingSeq = 0
 async function generate() {
   if (generating.value) return
   if (!rsaReady) {
@@ -43,43 +60,50 @@ async function generate() {
     return
   }
   generating.value = true
+  const my = ++generatingSeq
   try {
     // 先让「生成中…」渲染，再执行耗时生成（4096 秒级）
     await new Promise((r) => setTimeout(r, 50))
-    keyPair.value = await services.rsaGenerateKeyPair(keyBits.value)
-    pubPem.value = keyPair.value.publicKey
-    toast(`已生成 ${keyBits.value} 位密钥对`)
+    const kp = await services.rsaGenerateKeyPair(keyBits.value)
+    if (my !== generatingSeq) return
+    pubPem.value = kp.publicKey
+    priPem.value = kp.privateKey
+    toast(`已生成 ${keyBits.value} 位密钥对并填入下方输入框`)
   } catch (e) {
+    if (my !== generatingSeq) return
     toast('生成失败：' + (e?.message || '未知原因'))
   } finally {
-    generating.value = false
+    if (my === generatingSeq) generating.value = false
   }
 }
 
-function onCopyKey(text, label) {
-  copyText(text, label)
+/** 私钥提取公钥（等价 openssl rsa -pubout）：校验私钥区后导出并填入公钥区 */
+async function extractFromPrivate() {
+  if (priErr.value) return
+  if (!rsaReady) {
+    toast(PRELOAD_STALE_MSG)
+    return
+  }
+  try {
+    pubPem.value = await services.rsaExtractPublic(priPem.value)
+    toast('已由私钥导出公钥')
+  } catch (e) {
+    toast('提取失败：' + (e?.message || '未知原因'))
+  }
 }
 
-/* ---------- 公钥区 ---------- */
-
-const pubPem = ref('')
-const pubErr = computed(() => {
-  const r = validatePem(pubPem.value, 'public')
-  return r.ok ? '' : r.error
-})
+/* ---------- ② 加密（公钥） ---------- */
 
 const pubMode = ref('oaep') // oaep | pkcs1
 const pubPlain = ref('')
-const pubCipher = ref('') // 加密输出 / 验签输入共用（密文 Base64）
+const pubRes = ref({ ok: false, empty: true })
+/** 签名输入误粘 PEM 公钥/私钥的识别（真机反馈高频误用：签名应为「生成签名」产出的 Base64 串） */
+const pubSig = ref('')
+const pubSigLooksLikePem = computed(() => pubSig.value.trim().startsWith('-----BEGIN'))
 const pubHash = ref('sha256') // 验签哈希
-const pubSig = ref('') // 验签签名输入
-const pubRes = ref({ ok: false, empty: true }) // 加密结果
 const verifyRes = ref(null) // true / false / null
-/** 签名输入框误粘 PEM 公钥/私钥的识别（真机反馈高频误用：签名应为「生成签名」产出的 Base64 串） */
-const sigLooksLikePem = computed(() => pubSig.value.trim().startsWith('-----BEGIN'))
 
-/* RSA 单块加密上限：最大支持 4096 位密钥（OAEP-SHA256）约 470 字节明文，超限提前给出准确指引（W4 审查 I-1） */
-const RSA_PLAIN_MAX = 470
+const RSA_PLAIN_MAX = 470 // 单块加密上限：最大支持 4096 位密钥（OAEP-SHA256）约 470 字节明文
 
 function utf8ToB64(text) {
   const bytes = new TextEncoder().encode(text)
@@ -89,16 +113,11 @@ function utf8ToB64(text) {
   return btoa(bin)
 }
 
-/* 验签结论跟随数据失效：改签名或哈希后旧结论不得继续展示（W4 审查 I-2） */
-watch([pubSig, pubHash], () => {
-  verifyRes.value = null
-})
-
 let seq = 0
 watch([pubPem, pubPlain, pubMode], async () => {
   const my = ++seq
   verifyRes.value = null
-  if (!pubPlain.value.trim()) {
+  if (!pubPlain.value.trim() || !pubPem.value.trim()) {
     pubRes.value = { ok: false, empty: true }
     return
   }
@@ -119,8 +138,7 @@ watch([pubPem, pubPlain, pubMode], async () => {
     return
   }
   try {
-    const dataB64 = utf8ToB64(pubPlain.value)
-    const r = await services.rsaPublicEncrypt(pubPem.value, dataB64, pubMode.value)
+    const r = await services.rsaPublicEncrypt(pubPem.value, utf8ToB64(pubPlain.value), pubMode.value)
     if (my !== seq) return
     pubRes.value = { ok: true, data: r }
   } catch (e) {
@@ -129,41 +147,50 @@ watch([pubPem, pubPlain, pubMode], async () => {
   }
 })
 
-async function onVerify() {
-  if (!rsaReady || pubErr.value || !pubPlain.value.trim() || !pubSig.value.trim()) return
-  if (sigLooksLikePem.value) {
-    verifyRes.value = false // 走「误粘 PEM」专用提示分支
-    return
-  }
-  try {
-    verifyRes.value = (await services.rsaVerify(pubPem.value, pubPlain.value, pubSig.value, pubHash.value)) === true
-  } catch (e) {
-    verifyRes.value = false
-  }
-}
+/* ---------- ④ 签名（私钥） ---------- */
 
-/* ---------- 私钥区 ---------- */
-
-const priPem = ref('')
-const priErr = computed(() => {
-  const r = validatePem(priPem.value, 'private')
-  return r.ok ? '' : r.error
-})
-
-const priMode = ref('oaep')
-const priCipher = ref('')
-const priText = ref('') // 解密输出
 const priData = ref('') // 签名原文输入
 const priHash = ref('sha256')
 const priSig = ref('') // 签名输出
 const priSigHash = ref('') // 签名产出时的哈希（展示用，随产出固化）
-const priDecRes = ref({ ok: false, empty: true })
 const signing = ref(false)
+
+/* 结果失效联动（W4 审查 I-2/I-3）：改签名或哈希后旧验签结论不得继续展示；密钥/原文/哈希变化使旧签名失效 */
+watch([pubSig, pubHash], () => {
+  verifyRes.value = null
+})
+watch([priPem, priData, priHash], () => {
+  priSig.value = ''
+  priSigHash.value = ''
+})
+
+async function onSign() {
+  if (signing.value || priErr.value || !priData.value.trim()) return
+  if (!rsaReady) {
+    toast(PRELOAD_STALE_MSG)
+    return
+  }
+  signing.value = true
+  try {
+    priSig.value = await services.rsaSign(priPem.value, priData.value, priHash.value)
+    priSigHash.value = priHash.value // 固化生成时哈希，标签随产出而非随当前选择
+  } catch (e) {
+    toast('签名失败：' + (e?.message || '未知原因'))
+  } finally {
+    signing.value = false
+  }
+}
+
+/* ---------- ③ 解密（私钥） ---------- */
+
+const priMode = ref('oaep')
+const priCipher = ref('')
+const priDecRes = ref({ ok: false, empty: true })
 
 let seq2 = 0
 watch([priPem, priCipher, priMode], async () => {
   const my = ++seq2
-  if (!priCipher.value.trim()) {
+  if (!priCipher.value.trim() || !priPem.value.trim()) {
     priDecRes.value = { ok: false, empty: true }
     return
   }
@@ -187,33 +214,22 @@ watch([priPem, priCipher, priMode], async () => {
   }
 })
 
-async function onSign() {
-  if (signing.value || priErr.value || !priData.value.trim()) return
-  if (!rsaReady) {
-    toast(PRELOAD_STALE_MSG)
+/* ---------- ⑤ 验签（公钥） ---------- */
+
+async function onVerify() {
+  if (!rsaReady || pubErr.value || !pubPlain.value.trim() || !pubSig.value.trim()) return
+  if (pubSigLooksLikePem.value) {
+    verifyRes.value = false // 走「误粘 PEM」专用提示分支
     return
   }
-  signing.value = true
   try {
-    priSig.value = await services.rsaSign(priPem.value, priData.value, priHash.value)
-    priSigHash.value = priHash.value // 固化生成时哈希，标签随产出而非随当前选择（W4 审查 I-3）
+    verifyRes.value = (await services.rsaVerify(pubPem.value, pubPlain.value, pubSig.value, pubHash.value)) === true
   } catch (e) {
-    toast('签名失败：' + (e?.message || '未知原因'))
-  } finally {
-    signing.value = false
+    verifyRes.value = false
   }
 }
 
-/* 结果失效联动（W4 审查 I-2/I-3）：改签名或哈希后旧验签结论不得继续展示；密钥/原文/哈希变化使旧签名失效 */
-watch([pubSig, pubHash], () => {
-  verifyRes.value = null
-})
-watch([priPem, priData, priHash], () => {
-  priSig.value = ''
-  priSigHash.value = ''
-})
-
-/* ---------- 历史与主结果 ---------- */
+/* ---------- 历史 / 主结果 / 回放 ---------- */
 
 useHistRecorder('rsa', () => [pubPlain.value, pubPem.value], (src) => {
   if (!src[0].trim() || pubErr.value) return null
@@ -229,26 +245,6 @@ useMainResult(() => {
 
 useReplay('rsa', (v) => (pubPlain.value = String(v ?? '')))
 
-function extractPublic() {
-  if (!keyPair.value) return
-  try {
-    pubPem.value = keyPair.value.publicKey
-    toast('已提取公钥')
-  } catch (e) {
-    toast('提取失败：' + (e?.message || '未知原因'))
-  }
-}
-
-async function extractFromPrivate() {
-  if (priErr.value) return
-  try {
-    pubPem.value = await services.rsaExtractPublic(priPem.value)
-    toast('已提取公钥')
-  } catch (e) {
-    toast('提取失败：' + (e?.message || '浏览器调试不支持该操作'))
-  }
-}
-
 onMounted(() => {
   const p = consumeEnterPayload()
   if (p) pubPlain.value = String(p)
@@ -257,7 +253,7 @@ onMounted(() => {
 
 <template>
   <div class="tool-body">
-    <!-- preload 版本过旧提示（v1.2 批次新增能力需要重新装载插件生效） -->
+    <!-- preload 版本过旧提示 -->
     <div v-if="!rsaReady" class="alert" role="alert">
       <Icon name="alert" />
       <div class="alert-body">
@@ -269,10 +265,21 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 密钥对生成 -->
+    <!-- 使用指引 -->
+    <div class="guide">
+      <span>四种操作 · 两把钥匙：<b>加密 / 验签</b> 用公钥，<b>解密 / 签名</b> 用私钥。</span>
+      <span>典型流程：把公钥发给对方 → 对方用你的公钥加密后发回 → 你用私钥解密；要证明内容出自你手 → 私钥签名，对方用你的公钥验签。</span>
+    </div>
+
+    <!-- ① 密钥 -->
     <div class="block">
-      <div class="block-head">
-        <span>密钥对生成</span>
+      <div class="step-head">
+        <span class="step-badge">1</span>
+        <div class="step-texts">
+          <span class="step-title">密钥</span>
+          <span class="step-hint">公钥发给别人 · 私钥自己保管；也可直接粘贴已有的密钥</span>
+        </div>
+        <span class="grow"></span>
         <div class="seg" role="group" aria-label="密钥长度">
           <button
             v-for="b in RSA_BITS"
@@ -285,84 +292,87 @@ onMounted(() => {
             RSA-{{ b }}
           </button>
         </div>
-        <span class="grow"></span>
         <button type="button" class="btn btn--ghost" :disabled="generating" @click="generate">
           <Icon name="swap" size="sm" />{{ generating ? '生成中…' : '生成密钥对' }}
         </button>
         <button
-          v-if="keyPair"
+          v-if="priPem && !priErr"
           type="button"
           class="btn btn--ghost"
-          title="把当前生成的公钥填入下方公钥区"
-          @click="extractPublic"
-        >
-          填入公钥
-        </button>
-      </div>
-      <div v-if="keyPair" class="kv-grid">
-        <div class="kv-col">
-          <div class="block-head">
-            <span>公钥（SPKI PEM）</span>
-            <span class="grow"></span>
-            <button type="button" class="icon-btn" aria-label="复制公钥" title="复制公钥" @click="onCopyKey(keyPair.publicKey, '公钥')">
-              <Icon name="copy" size="sm" />
-            </button>
-          </div>
-          <div class="pane pane--text pem-pane">
-            <div class="pane-scroll"><span class="mono">{{ keyPair.publicKey }}</span></div>
-          </div>
-        </div>
-        <div class="kv-col">
-          <div class="block-head">
-            <span>私钥（PKCS#8 PEM，妥善保管）</span>
-            <span class="grow"></span>
-            <button type="button" class="icon-btn" aria-label="复制私钥" title="复制私钥" @click="onCopyKey(keyPair.privateKey, '私钥')">
-              <Icon name="copy" size="sm" />
-            </button>
-          </div>
-          <div class="pane pane--text pem-pane">
-            <div class="pane-scroll"><span class="mono">{{ keyPair.privateKey }}</span></div>
-          </div>
-        </div>
-      </div>
-      <div v-else class="placeholder" style="padding: 6px 0">
-        点击「生成密钥对」开始；密钥仅在本机内存中生成与展示，不落盘、不上传。
-      </div>
-    </div>
-
-    <!-- 公钥操作 -->
-    <div class="block">
-      <div class="block-head">
-        <span>公钥 · 加密 / 验签</span>
-        <div class="seg" role="group" aria-label="加密填充">
-          <button type="button" :aria-pressed="pubMode === 'oaep'" title="OAEP-SHA256（推荐）" @click="pubMode = 'oaep'">OAEP</button>
-          <button type="button" :aria-pressed="pubMode === 'pkcs1'" title="PKCS#1 v1.5（兼容旧系统）" @click="pubMode = 'pkcs1'">PKCS#1</button>
-        </div>
-        <span class="grow"></span>
-        <button
-          v-if="priPem"
-          type="button"
-          class="btn btn--ghost"
-          title="由下方私钥导出公钥"
+          title="由下方私钥导出公钥并填入"
           @click="extractFromPrivate"
         >
           私钥提取公钥
         </button>
       </div>
-      <textarea
-        v-model="pubPem"
-        class="textarea pem-textarea"
-        style="min-height: 72px"
-        placeholder="粘贴公钥 PEM（-----BEGIN PUBLIC KEY-----）"
-        spellcheck="false"
-      ></textarea>
-      <div class="alert" :hidden="!pubErr" role="alert">
-        <Icon name="alert" />
-        <span>{{ pubErr }}</span>
+      <div class="key-cols">
+        <div class="key-col">
+          <div class="block-head">
+            <label for="rsaPubPem">公钥（SPKI PEM · 用于加密与验签）</label>
+            <span class="tag" :class="pubStatusText.includes('✓') ? 'tag--ok' : pubStatusText.includes('有误') ? 'tag--err' : ''">
+              {{ pubStatusText }}
+            </span>
+            <span class="grow"></span>
+            <button type="button" class="icon-btn" aria-label="复制公钥" title="复制公钥" :disabled="!pubPem" @click="copyText(pubPem, '公钥')">
+              <Icon name="copy" size="sm" />
+            </button>
+          </div>
+          <textarea
+            id="rsaPubPem"
+            v-model="pubPem"
+            class="textarea pem-textarea"
+            style="min-height: 72px"
+            placeholder="粘贴公钥 PEM（-----BEGIN PUBLIC KEY-----）"
+            spellcheck="false"
+          ></textarea>
+          <div class="alert" :hidden="!pubPem || !pubErr" role="alert">
+            <Icon name="alert" />
+            <span>{{ pubErr }}</span>
+          </div>
+        </div>
+        <div class="key-col">
+          <div class="block-head">
+            <label for="rsaPriPem">私钥（PKCS#8 PEM · 用于解密与签名，妥善保管）</label>
+            <span class="tag" :class="priStatusText.includes('✓') ? 'tag--ok' : priStatusText.includes('有误') ? 'tag--err' : ''">
+              {{ priStatusText }}
+            </span>
+            <span class="grow"></span>
+            <button type="button" class="icon-btn" aria-label="复制私钥" title="复制私钥" :disabled="!priPem" @click="copyText(priPem, '私钥')">
+              <Icon name="copy" size="sm" />
+            </button>
+          </div>
+          <textarea
+            id="rsaPriPem"
+            v-model="priPem"
+            class="textarea pem-textarea"
+            style="min-height: 72px"
+            placeholder="粘贴私钥 PEM（-----BEGIN PRIVATE KEY-----）"
+            spellcheck="false"
+          ></textarea>
+          <div class="alert" :hidden="!priPem || !priErr" role="alert">
+            <Icon name="alert" />
+            <span>{{ priErr }}</span>
+          </div>
+        </div>
       </div>
+    </div>
 
-      <div class="block-head" style="margin-top: 8px">
-        <label for="rsaPubPlain">原文（加密 / 验签共用）</label>
+    <!-- ② 加密 -->
+    <div class="block">
+      <div class="step-head">
+        <span class="step-badge">2</span>
+        <div class="step-texts">
+          <span class="step-title">加密</span>
+          <span class="step-hint">用上方公钥把明文变成密文 · 只有对应私钥能解开</span>
+        </div>
+        <span class="grow"></span>
+        <div class="seg" role="group" aria-label="加密填充">
+          <button type="button" :aria-pressed="pubMode === 'oaep'" title="OAEP-SHA256（推荐）" @click="pubMode = 'oaep'">OAEP</button>
+          <button type="button" :aria-pressed="pubMode === 'pkcs1'" title="PKCS#1 v1.5（兼容旧系统）" @click="pubMode = 'pkcs1'">PKCS#1</button>
+        </div>
+      </div>
+      <div class="block-head">
+        <label for="rsaPubPlain">明文（单次最多约 470 字节，长内容请用 AES）</label>
         <span class="grow"></span>
       </div>
       <textarea
@@ -370,74 +380,44 @@ onMounted(() => {
         v-model="pubPlain"
         class="textarea"
         style="min-height: 64px"
-        placeholder="输入要加密的明文；同一原文也可用于验签"
+        placeholder="输入要加密的明文；输入后自动加密"
         spellcheck="false"
       ></textarea>
-
-      <div class="block-head" style="margin-top: 8px">
-        <span>加密结果（Base64）</span>
+      <div class="block-head" style="margin-top: 6px">
+        <span>密文（Base64）</span>
         <span class="grow"></span>
-        <button type="button" class="icon-btn" aria-label="复制加密结果" title="复制加密结果" :disabled="!pubRes.ok" @click="copyText(pubRes.data, '加密结果')">
+        <button type="button" class="icon-btn" aria-label="复制密文" title="复制密文" :disabled="!pubRes.ok" @click="copyText(pubRes.data, '加密结果')">
           <Icon name="copy" size="sm" />
         </button>
       </div>
       <div class="pane pane--text">
         <div class="pane-scroll">
-          <div v-if="!pubPlain.trim()" class="placeholder">输入原文后自动加密。</div>
-          <span v-else-if="pubErr">—</span>
-          <template v-else>{{ pubRes.ok ? pubRes.data : pubRes.error || '—' }}</template>
+          <div v-if="!pubPlain.trim() || !pubPem.trim()" class="placeholder">上方公钥就绪并输入明文后，这里显示密文。</div>
+          <span v-else-if="pubRes.error">—</span>
+          <template v-else>{{ pubRes.data }}</template>
         </div>
       </div>
-
-      <div class="block-head" style="margin-top: 8px">
-        <label for="rsaPubSig">验签：签名（Base64）</label>
-        <div class="seg" role="group" aria-label="验签哈希">
-          <button type="button" :aria-pressed="pubHash === 'sha256'" @click="pubHash = 'sha256'">SHA-256</button>
-          <button type="button" :aria-pressed="pubHash === 'sha1'" @click="pubHash = 'sha1'">SHA-1</button>
-        </div>
-        <span class="grow"></span>
-        <button type="button" class="btn btn--ghost" :disabled="!rsaReady || pubErr || !pubPlain.trim() || !pubSig.trim()" @click="onVerify">验证签名</button>
-        <span v-if="verifyRes === true" class="tag tag--ok">验签通过</span>
-        <span v-else-if="verifyRes === false && sigLooksLikePem" class="tag tag--err">粘贴的是 PEM 公钥，不是签名——请先在「私钥」区用「生成签名」产出 Base64 签名</span>
-        <span v-else-if="verifyRes === false" class="tag tag--err">验签失败（内容或签名被篡改，或密钥/哈希不匹配）</span>
-      </div>
-      <input
-        id="rsaPubSig"
-        v-model="pubSig"
-        class="input"
-        style="font-family: var(--mono)"
-        placeholder="粘贴「生成签名」产出的 Base64 签名（不是公钥，也不是密文）"
-        autocomplete="off"
-        spellcheck="false"
-      />
     </div>
 
-    <!-- 私钥操作 -->
+    <!-- ③ 解密 -->
     <div class="block">
-      <div class="block-head">
-        <span>私钥 · 解密 / 签名</span>
+      <div class="step-head">
+        <span class="step-badge">3</span>
+        <div class="step-texts">
+          <span class="step-title">解密</span>
+          <span class="step-hint">用私钥还原「用你的公钥加密」的密文</span>
+        </div>
+        <span class="grow"></span>
         <div class="seg" role="group" aria-label="解密填充">
           <button type="button" :aria-pressed="priMode === 'oaep'" @click="priMode = 'oaep'">OAEP</button>
           <button type="button" :aria-pressed="priMode === 'pkcs1'" @click="priMode = 'pkcs1'">PKCS#1</button>
         </div>
       </div>
-      <textarea
-        v-model="priPem"
-        class="textarea pem-textarea"
-        style="min-height: 72px"
-        placeholder="粘贴私钥 PEM（-----BEGIN PRIVATE KEY-----）"
-        spellcheck="false"
-      ></textarea>
-      <div class="alert" :hidden="!priErr" role="alert">
-        <Icon name="alert" />
-        <span>{{ priErr }}</span>
-      </div>
-
-      <div class="block-head" style="margin-top: 8px">
-        <label for="rsaPriCipher">密文（Base64，与加密填充方式一致）</label>
+      <div class="block-head">
+        <label for="rsaPriCipher">密文（Base64，与加密时的填充方式一致）</label>
         <span class="grow"></span>
-        <button type="button" class="btn btn--ghost" :disabled="!priDecRes.ok" @click="copyText(priDecRes.data, '解密结果')">
-          <Icon name="copy" size="sm" />复制
+        <button type="button" class="icon-btn" aria-label="复制解密结果" title="复制解密结果" :disabled="!priDecRes.ok" @click="copyText(priDecRes.data, '解密结果')">
+          <Icon name="copy" size="sm" />
         </button>
       </div>
       <input
@@ -445,28 +425,39 @@ onMounted(() => {
         v-model="priCipher"
         class="input"
         style="font-family: var(--mono)"
-        placeholder="粘贴加密结果"
+        placeholder="粘贴收到的密文"
         autocomplete="off"
         spellcheck="false"
       />
       <div class="pane pane--text" style="margin-top: 6px">
         <div class="pane-scroll">
-          <div v-if="!priCipher.trim()" class="placeholder">粘贴密文后自动解密。</div>
-          <span v-else-if="priErr">—</span>
-          <template v-else>{{ priDecRes.ok ? priDecRes.data : priDecRes.error || '—' }}</template>
+          <div v-if="!priCipher.trim() || !priPem.trim()" class="placeholder">私钥就绪并粘贴密文后，这里显示还原的明文。</div>
+          <span v-else-if="priDecRes.error">—</span>
+          <template v-else>{{ priDecRes.data }}</template>
         </div>
       </div>
+    </div>
 
-      <div class="block-head" style="margin-top: 8px">
-        <label for="rsaPriData">签名：原文</label>
+    <!-- ④ 签名 -->
+    <div class="block">
+      <div class="step-head">
+        <span class="step-badge">4</span>
+        <div class="step-texts">
+          <span class="step-title">签名</span>
+          <span class="step-hint">用私钥证明「这段内容出自我手、未被篡改」</span>
+        </div>
+        <span class="grow"></span>
         <div class="seg" role="group" aria-label="签名哈希">
           <button type="button" :aria-pressed="priHash === 'sha256'" @click="priHash = 'sha256'">SHA-256</button>
           <button type="button" :aria-pressed="priHash === 'sha1'" @click="priHash = 'sha1'">SHA-1</button>
         </div>
-        <span class="grow"></span>
         <button type="button" class="btn btn--ghost" :disabled="priErr || !priData.trim() || signing" @click="onSign">
           {{ signing ? '签名中…' : '生成签名' }}
         </button>
+      </div>
+      <div class="block-head">
+        <label for="rsaPriData">要签名的原文</label>
+        <span class="grow"></span>
       </div>
       <textarea
         id="rsaPriData"
@@ -484,6 +475,44 @@ onMounted(() => {
         </button>
       </div>
     </div>
+
+    <!-- ⑤ 验签 -->
+    <div class="block">
+      <div class="step-head">
+        <span class="step-badge">5</span>
+        <div class="step-texts">
+          <span class="step-title">验签</span>
+          <span class="step-hint">用公钥核对「签名与原文是否匹配」——核对时原文需与签名时一致</span>
+        </div>
+        <span class="grow"></span>
+        <div class="seg" role="group" aria-label="验签哈希">
+          <button type="button" :aria-pressed="pubHash === 'sha256'" @click="pubHash = 'sha256'">SHA-256</button>
+          <button type="button" :aria-pressed="pubHash === 'sha1'" @click="pubHash = 'sha1'">SHA-1</button>
+        </div>
+        <button type="button" class="btn btn--ghost" :disabled="!rsaReady || pubErr || !pubPlain.trim() || !pubSig.trim() || pubSigLooksLikePem" @click="onVerify">验证签名</button>
+        <span v-if="verifyRes === true" class="tag tag--ok">验签通过</span>
+        <span v-else-if="verifyRes === false && pubSigLooksLikePem" class="tag tag--err">粘贴的是 PEM 公钥，不是签名——请先在「④ 签名」用「生成签名」产出 Base64 签名</span>
+        <span v-else-if="verifyRes === false" class="tag tag--err">验签失败（内容或签名被篡改，或密钥/哈希不匹配）</span>
+      </div>
+      <div class="block-head">
+        <label for="rsaPubSig">对方给的签名（Base64）</label>
+        <span class="grow"></span>
+      </div>
+      <input
+        id="rsaPubSig"
+        v-model="pubSig"
+        class="input"
+        style="font-family: var(--mono)"
+        placeholder="粘贴「生成签名」产出的 Base64 签名（不是公钥，也不是密文）"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div class="pane pane--text" style="margin-top: 6px">
+        <div class="pane-scroll">
+          <div class="placeholder">被验签的原文使用上方「② 加密」的明文输入框（两者共用，保证核对的是同一份内容）。</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -492,26 +521,71 @@ onMounted(() => {
 .tool-body > .block {
   flex-shrink: 0;
 }
-.pem-textarea {
-  font-family: var(--mono);
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
   font-size: var(--fs-12);
+  line-height: 1.6;
 }
-.pem-pane {
-  max-height: 120px;
+.guide b {
+  color: var(--fg);
 }
-.kv-grid {
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 30px;
+  margin-bottom: var(--sp-8);
+  padding-bottom: var(--sp-8);
+  border-bottom: 1px solid var(--border);
+}
+.step-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text, #fff);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+.step-texts {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.step-title {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--fg);
+}
+.step-hint {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.key-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-12);
   margin-top: 8px;
 }
-.kv-col {
+.key-col {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.mono {
-  word-break: break-all;
-  white-space: pre-wrap;
+.pem-textarea {
+  font-family: var(--mono);
+  font-size: var(--fs-12);
 }
 </style>
