@@ -75,6 +75,8 @@ const pubHash = ref('sha256') // 验签哈希
 const pubSig = ref('') // 验签签名输入
 const pubRes = ref({ ok: false, empty: true }) // 加密结果
 const verifyRes = ref(null) // true / false / null
+/** 签名输入框误粘 PEM 公钥/私钥的识别（真机反馈高频误用：签名应为「生成签名」产出的 Base64 串） */
+const sigLooksLikePem = computed(() => pubSig.value.trim().startsWith('-----BEGIN'))
 
 /* RSA 单块加密上限：最大支持 4096 位密钥（OAEP-SHA256）约 470 字节明文，超限提前给出准确指引（W4 审查 I-1） */
 const RSA_PLAIN_MAX = 470
@@ -129,6 +131,10 @@ watch([pubPem, pubPlain, pubMode], async () => {
 
 async function onVerify() {
   if (!rsaReady || pubErr.value || !pubPlain.value.trim() || !pubSig.value.trim()) return
+  if (sigLooksLikePem.value) {
+    verifyRes.value = false // 走「误粘 PEM」专用提示分支
+    return
+  }
   try {
     verifyRes.value = (await services.rsaVerify(pubPem.value, pubPlain.value, pubSig.value, pubHash.value)) === true
   } catch (e) {
@@ -392,6 +398,7 @@ onMounted(() => {
         <span class="grow"></span>
         <button type="button" class="btn btn--ghost" :disabled="!rsaReady || pubErr || !pubPlain.trim() || !pubSig.trim()" @click="onVerify">验证签名</button>
         <span v-if="verifyRes === true" class="tag tag--ok">验签通过</span>
+        <span v-else-if="verifyRes === false && sigLooksLikePem" class="tag tag--err">粘贴的是 PEM 公钥，不是签名——请先在「私钥」区用「生成签名」产出 Base64 签名</span>
         <span v-else-if="verifyRes === false" class="tag tag--err">验签失败（内容或签名被篡改，或密钥/哈希不匹配）</span>
       </div>
       <input
@@ -399,7 +406,7 @@ onMounted(() => {
         v-model="pubSig"
         class="input"
         style="font-family: var(--mono)"
-        placeholder="粘贴 Base64 签名"
+        placeholder="粘贴「生成签名」产出的 Base64 签名（不是公钥，也不是密文）"
         autocomplete="off"
         spellcheck="false"
       />
