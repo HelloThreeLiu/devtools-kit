@@ -1,9 +1,11 @@
 <script setup>
 /**
- * AES 加解密（R2.5）
- * CBC（默认，PKCS#7）/ GCM（推荐，认证标签随密文）；密钥 128/192/256 位
- * （Hex/Base64，可一键随机生成）；IV 自动生成并分栏返回，解密方向粘贴 IV；
- * 密文 Base64 / Hex 两种格式
+ * AES 加解密（R2.5）—— 按任务动线分三个步骤区：
+ * ① 密钥与模式（加密/解密共用）→ ② 加密（明文 → 密文，IV 自动生成）
+ * → ③ 解密（密文 → 明文，需同名 IV）。
+ * CBC（默认，PKCS#7，与 OpenSSL 互验）/ GCM（推荐，认证标签随密文）；
+ * 密钥 128/192/256 位一键生成（Hex/Base64）；密文与 IV 支持 Base64 / Hex。
+ * 纯函数在 utils/convert/aes.js（WebCrypto）；UI 仅编排输入输出。
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
@@ -21,171 +23,138 @@ import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
-const direction = ref('encrypt') // encrypt | decrypt
-const mode = ref('CBC') // CBC | GCM
-const keyBits = ref(256)
-const keyFormat = ref('hex') // hex | base64：密钥的解析/展示格式
-const dataFormat = ref('base64') // base64 | hex：加密 = 密文与 IV 输出；解密 = 密文与 IV 输入
-const key = ref('')
-const ivInput = ref('') // 解密方向的 IV
-const text = ref('')
-const textEl = ref(null)
-const res = ref({ ok: false, empty: true })
-
-useReplay('aes', (v) => (text.value = String(v ?? '')))
-
-/* 历史：全部输入停顿 1s 后写入（异步结果由 hook await） */
-useHistRecorder(
-  'aes',
-  () => [text.value, key.value, ivInput.value, direction.value, mode.value, keyFormat.value, dataFormat.value],
-  async (src) => {
-    const [t, k, iv, dir, m, kf, df] = src
-    if (!t.trim() || !k.trim()) return null
-    if (dir === 'encrypt') {
-      const r = await aesEncrypt({ key: k, keyFormat: kf, mode: m, plaintext: t, output: df })
-      return r.ok ? r.data : null
-    }
-    const r = await aesDecrypt({ key: k, keyFormat: kf, mode: m, iv, cipher: t, inputFormat: df })
-    return r.ok ? r.data : null
-  },
-)
-
-/* Ctrl+Enter 复制主结果（PRD 4.2-2） */
-useMainResult(() => (out.value ? { value: out.value, label: direction.value === 'encrypt' ? '密文' : '明文' } : null))
-
-const directions = [
-  { id: 'encrypt', label: '加密' },
-  { id: 'decrypt', label: '解密' },
-]
-
 const dataFormats = [
   { id: 'base64', label: 'Base64' },
   { id: 'hex', label: 'Hex' },
 ]
 
-/* 异步计算：输入任一变化触发，seq 守卫丢弃过期结果 */
-let seq = 0
-watch([text, key, ivInput, direction, mode, keyFormat, dataFormat], async () => {
-  const my = ++seq
-  if (!text.value.trim() || !key.value.trim()) {
-    res.value = { ok: false, empty: true }
-    return
-  }
-  let r
-  if (direction.value === 'encrypt') {
-    r = await aesEncrypt({ key: key.value, keyFormat: keyFormat.value, mode: mode.value, plaintext: text.value, output: dataFormat.value })
-  } else {
-    // IV 未输入属于「待补全」而非格式错误，给出指引性提示（W4 审查 M-10）
-    if (!ivInput.value.trim()) {
-      res.value = { ok: false, error: '请输入加密时返回的 IV（上方结果区可直接复制）' }
-      return
-    }
-    r = await aesDecrypt({ key: key.value, keyFormat: keyFormat.value, mode: mode.value, iv: ivInput.value, cipher: text.value, inputFormat: dataFormat.value })
-  }
-  if (my !== seq) return
-  res.value = r
-})
+/* ---------- ① 密钥与模式 ---------- */
 
-const err = computed(() => (res.value.error ? res.value.error : ''))
-const out = computed(() => (res.value.ok ? res.value.data : ''))
-const outIv = computed(() => (res.value.ok && res.value.iv ? res.value.iv : ''))
+const key = ref('')
+const keyBits = ref(256)
+const keyFormat = ref('hex') // 密钥文本格式（与密文格式无关）
+const mode = ref('CBC') // CBC | GCM（加密/解密共用）
+const dataFormat = ref('base64') // base64 | hex：密文与 IV 的编码（两方向保持一致即可互通）
 
-/* 切到解密方向时自动回填刚生成的 IV，免去手动复制（W4 审查建议 1） */
-watch(direction, (d, old) => {
-  if (d === 'decrypt' && old === 'encrypt' && outIv.value && !ivInput.value) ivInput.value = outIv.value
-})
-
-const directionLabel = computed(() =>
-  !text.value.trim() ? '—' : direction.value === 'encrypt' ? `明文 → 密文（AES-${mode.value}）` : `密文 → 明文（AES-${mode.value}）`,
-)
-
-const dataFormatLabel = computed(() => (dataFormat.value === 'hex' ? 'Hex' : 'Base64'))
-
-/** 结果区脚注：按模式给出准确说明（CBC 无认证标签，W4 修正——此前 GCM 文案在 CBC 下错误显示） */
-const footText = computed(() => {
-  if (!res.value.ok || direction.value !== 'encrypt') return ''
-  return mode.value === 'GCM'
-    ? `GCM 认证标签已随密文返回（尾部 16 字节）· ${dataFormatLabel.value} 格式`
-    : `CBC · PKCS#7 填充（密文长度为 16 字节的倍数）· ${dataFormatLabel.value} 格式`
-})
-
-/* 随机密钥：记住原始字节，切换密钥格式时自动重编码（手动编辑后解除绑定） */
-let generatedKeyBytes = null
+let generatedKeyBytes = null // 生成密钥的原始字节：切换密钥格式时自动重编码（手动编辑解除绑定）
 function onKeyInput() {
   generatedKeyBytes = null
 }
 function genKey() {
-  const r = generateAesKey(keyBits.value, 'raw')
-  generatedKeyBytes = r.key
-  key.value = aesKeyToString(r.key, keyFormat.value)
+  generatedKeyBytes = generateAesKey(keyBits.value, 'raw').key
+  key.value = aesKeyToString(generatedKeyBytes, keyFormat.value)
 }
 watch(keyFormat, () => {
   if (generatedKeyBytes) key.value = aesKeyToString(generatedKeyBytes, keyFormat.value)
 })
 
-function onCopy() {
-  copyText(out.value, direction.value === 'encrypt' ? '密文' : '明文')
-}
+const keyFormatLabel = computed(() => (keyFormat.value === 'hex' ? 'Hex' : 'Base64'))
+const dataFormatLabel = computed(() => (dataFormat.value === 'hex' ? 'Hex' : 'Base64'))
 
-function onCopyIv() {
-  copyText(outIv.value, 'IV')
-}
+/* ---------- ② 加密 ---------- */
 
-function clearInput() {
-  text.value = ''
-  textEl.value?.focus()
-}
+const encPlain = ref('')
+const encRes = ref({ ok: false, empty: true })
+const encIv = computed(() => (encRes.value.ok && encRes.value.iv ? encRes.value.iv : ''))
+
+let seq1 = 0
+watch([encPlain, key, keyFormat, dataFormat, mode], async () => {
+  const my = ++seq1
+  if (!encPlain.value.trim() || !key.value.trim()) {
+    encRes.value = { ok: false, empty: true }
+    return
+  }
+  const r = await aesEncrypt({ key: key.value, keyFormat: keyFormat.value, mode: mode.value, plaintext: encPlain.value, output: dataFormat.value })
+  if (my !== seq1) return
+  encRes.value = r
+})
+
+const encFoot = computed(() => {
+  if (!encRes.value.ok) return ''
+  return mode.value === 'GCM'
+    ? `GCM 认证标签已随密文返回（尾部 16 字节）· ${dataFormatLabel.value} 格式`
+    : `CBC · PKCS#7 填充（密文长度为 16 字节的倍数）· ${dataFormatLabel.value} 格式`
+})
+
+/* ---------- ③ 解密 ---------- */
+
+const decCipher = ref('')
+const decIv = ref('')
+const decRes = ref({ ok: false, empty: true })
+
+let seq2 = 0
+watch([decCipher, decIv, key, keyFormat, dataFormat, mode], async () => {
+  const my = ++seq2
+  if (!decCipher.value.trim() || !key.value.trim()) {
+    decRes.value = { ok: false, empty: true }
+    return
+  }
+  if (!decIv.value.trim()) {
+    decRes.value = { ok: false, error: '请输入加密时返回的 IV（② 加密区可直接复制）' }
+    return
+  }
+  const r = await aesDecrypt({ key: key.value, keyFormat: keyFormat.value, mode: mode.value, iv: decIv.value, cipher: decCipher.value, inputFormat: dataFormat.value })
+  if (my !== seq2) return
+  decRes.value = r
+})
+
+/* ---------- 历史 / 主结果 / 回放 ---------- */
+
+/* 历史记录加密流程（入库 input = 明文；密钥不入库——getter 数组首元素为入库 input） */
+useHistRecorder(
+  'aes',
+  () => [encPlain.value, decCipher.value, decIv.value, key.value, keyFormat.value, dataFormat.value, mode.value],
+  async (src) => {
+    const [e, , , k, kf, df, m] = src
+    if (!e.trim() || !k.trim()) return null
+    const r = await aesEncrypt({ key: k, keyFormat: kf, mode: m, plaintext: e, output: df })
+    return r.ok ? r.data : null
+  },
+)
+
+useMainResult(() => {
+  if (decRes.value.ok) return { value: decRes.value.data, label: '解密明文' }
+  if (encRes.value.ok) return { value: encRes.value.data, label: '加密密文' }
+  return null
+})
+
+useReplay('aes', (v) => (encPlain.value = String(v ?? '')))
 
 onMounted(() => {
   const p = consumeEnterPayload()
-  if (p) text.value = String(p)
-  textEl.value?.focus()
+  if (p) encPlain.value = String(p)
 })
 </script>
 
 <template>
   <div class="tool-body">
+    <!-- 使用指引 -->
+    <div class="guide">
+      <span>解密需要与加密时<b>完全相同</b>的密钥和 IV——三者任一不同都无法还原，密钥丢失数据不可恢复。</span>
+      <span>密文与 IV 支持 Base64 / Hex 两种编码；两方向保持同一种即可互通。</span>
+    </div>
+
+    <!-- ① 密钥与模式 -->
     <div class="block">
-      <div class="seg" role="group" aria-label="方向">
-        <button
-          v-for="d in directions"
-          :key="d.id"
-          type="button"
-          :aria-pressed="direction === d.id"
-          @click="direction = d.id"
-        >
-          {{ d.label }}
-        </button>
-        <button
-          v-for="m in MODES"
-          :key="m.id"
-          type="button"
-          :aria-pressed="mode === m.id"
-          :title="m.hint"
-          @click="mode = m.id"
-        >
-          {{ m.label }}
-        </button>
-        <span style="width: 12px" aria-hidden="true"></span>
-        <button
-          v-for="f in dataFormats"
-          :key="f.id"
-          type="button"
-          :aria-pressed="dataFormat === f.id"
-          :title="direction === 'encrypt' ? '密文与 IV 的输出格式' : '密文与 IV 的输入格式'"
-          @click="dataFormat = f.id"
-        >
-          {{ f.label }}
+      <div class="step-head">
+        <span class="step-badge">1</span>
+        <div class="step-texts">
+          <span class="step-title">密钥与模式</span>
+          <span class="step-hint">加密与解密共用同一把密钥、同一个模式</span>
+        </div>
+        <span class="grow"></span>
+        <button type="button" class="btn btn--ghost" title="用 crypto.getRandomValues 生成随机密钥" @click="genKey">
+          <Icon name="swap" size="sm" />生成密钥
         </button>
       </div>
-
-      <div class="block-head" style="margin-top: 8px">
-        <label for="aesKey">密钥（{{ keyFormat === 'hex' ? 'Hex' : 'Base64' }}）</label>
+      <div class="block-head">
+        <label for="aesKey">密钥</label>
         <div class="seg" role="group" aria-label="密钥格式">
           <button type="button" :aria-pressed="keyFormat === 'hex'" @click="keyFormat = 'hex'">Hex</button>
           <button type="button" :aria-pressed="keyFormat === 'base64'" @click="keyFormat = 'base64'">Base64</button>
         </div>
         <span class="grow"></span>
+        <span class="step-hint">长度即强度（128 已足够安全，256 余量更高）</span>
         <div class="seg" role="group" aria-label="密钥长度">
           <button
             v-for="b in KEY_BITS"
@@ -197,9 +166,6 @@ onMounted(() => {
             AES-{{ b }}
           </button>
         </div>
-        <button type="button" class="btn btn--ghost" title="用 crypto.getRandomValues 生成随机密钥" @click="genKey">
-          <Icon name="swap" size="sm" />生成密钥
-        </button>
       </div>
       <input
         id="aesKey"
@@ -211,76 +177,206 @@ onMounted(() => {
         spellcheck="false"
         @input="onKeyInput"
       />
-
-      <!-- 解密方向：IV 输入 -->
-      <template v-if="direction === 'decrypt'">
-        <div class="block-head" style="margin-top: 8px">
-          <label for="aesIv">IV（{{ dataFormatLabel }}，{{ mode === 'GCM' ? 12 : 16 }} 字节）</label>
-          <span class="grow"></span>
-        </div>
-        <input
-          id="aesIv"
-          v-model="ivInput"
-          class="input"
-          style="font-family: var(--mono)"
-          placeholder="粘贴加密时返回的 IV"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </template>
-
       <div class="block-head" style="margin-top: 8px">
-        <label for="aesText">{{ direction === 'encrypt' ? '明文' : '密文' }}</label>
-        <span class="tag">{{ directionLabel }}</span>
+        <span>模式与密文编码（加密 / 解密共用）</span>
         <span class="grow"></span>
-        <button type="button" class="btn btn--ghost" @click="clearInput">清空</button>
-      </div>
-      <textarea
-        id="aesText"
-        ref="textEl"
-        v-model="text"
-        class="textarea"
-        style="min-height: 88px"
-        :placeholder="direction === 'encrypt' ? '输入要加密的文本' : dataFormat === 'hex' ? '粘贴 Hex 密文' : '粘贴 Base64 密文'"
-        spellcheck="false"
-      ></textarea>
-      <div class="alert" :hidden="!err" role="alert">
-        <Icon name="alert" />
-        <span>{{ err }}</span>
+        <div class="seg" role="group" aria-label="模式">
+          <button
+            v-for="m in MODES"
+            :key="m.id"
+            type="button"
+            :aria-pressed="mode === m.id"
+            :title="m.hint"
+            @click="mode = m.id"
+          >
+            {{ m.label }}
+          </button>
+        </div>
+        <div class="seg" role="group" aria-label="密文编码">
+          <button
+            v-for="f in dataFormats"
+            :key="f.id"
+            type="button"
+            :aria-pressed="dataFormat === f.id"
+            @click="dataFormat = f.id"
+          >
+            {{ f.label }}
+          </button>
+        </div>
       </div>
     </div>
 
-    <div class="block block--fill">
-      <div class="block-head">
-        <span>{{ direction === 'encrypt' ? '密文' : '明文' }}</span>
-        <span v-if="res.ok" class="tag">AES-{{ mode }}</span>
+    <!-- ② 加密 -->
+    <div class="block">
+      <div class="step-head">
+        <span class="step-badge">2</span>
+        <div class="step-texts">
+          <span class="step-title">加密</span>
+          <span class="step-hint">用上方密钥把明文变成密文 · IV 自动生成</span>
+        </div>
         <span class="grow"></span>
-        <button type="button" class="btn btn--ghost" :disabled="!out" @click="onCopy">
-          <Icon name="copy" size="sm" />复制
+        <button type="button" class="btn btn--ghost" :disabled="!encPlain" @click="encPlain = ''">清空</button>
+      </div>
+      <div class="block-head">
+        <label for="aesEncPlain">明文</label>
+        <span class="grow"></span>
+      </div>
+      <textarea
+        id="aesEncPlain"
+        v-model="encPlain"
+        class="textarea"
+        style="min-height: 64px"
+        placeholder="输入要加密的明文；输入后自动加密"
+        spellcheck="false"
+      ></textarea>
+      <div class="alert" :hidden="!encRes.error" role="alert">
+        <Icon name="alert" />
+        <span>{{ encRes.error }}</span>
+      </div>
+      <div class="block-head iv-head">
+        <span class="tag" title="加密自动生成的初始向量 · 解密时必须提供同名 IV">IV · {{ dataFormatLabel }}</span>
+        <code class="mono iv-text">{{ encIv }}</code>
+        <span class="grow"></span>
+        <button type="button" class="icon-btn" aria-label="复制 IV" title="复制 IV" :disabled="!encIv" @click="copyText(encIv, 'IV')">
+          <Icon name="copy" size="sm" />
         </button>
       </div>
-      <!-- 加密方向：IV 分栏展示，解密时需要同名 IV -->
-      <div v-if="direction === 'encrypt' && outIv" class="block-head">
-        <span class="tag" title="加密自动生成的初始向量，解密时必须提供同名 IV">IV · {{ dataFormatLabel }}</span>
-        <code class="mono iv-text">{{ outIv }}</code>
+      <div class="block-head">
+        <span>密文（{{ dataFormatLabel }}）</span>
         <span class="grow"></span>
-        <button type="button" class="icon-btn" aria-label="复制 IV" title="复制 IV" @click="onCopyIv">
+        <button type="button" class="icon-btn" aria-label="复制密文" title="复制密文" :disabled="!encRes.ok" @click="copyText(encRes.data, '加密结果')">
           <Icon name="copy" size="sm" />
         </button>
       </div>
       <div class="pane pane--text">
         <div class="pane-scroll">
-          <div v-if="!text.trim()" class="placeholder">输入{{ direction === 'encrypt' ? '明文与密钥' : '密文、密钥与 IV' }}后自动转换。</div>
-          <span v-else-if="err">—</span>
-          <template v-else>{{ out }}</template>
+          <div v-if="!encPlain.trim() || !key.trim()" class="placeholder">① 的密钥就绪并输入明文后，这里显示密文与 IV。</div>
+          <span v-else-if="encRes.error">—</span>
+          <template v-else>{{ encRes.data }}</template>
         </div>
-        <div class="pane-foot">{{ footText }}</div>
+        <div class="pane-foot">{{ encFoot }}</div>
+      </div>
+    </div>
+
+    <!-- ③ 解密 -->
+    <div class="block">
+      <div class="step-head">
+        <span class="step-badge">3</span>
+        <div class="step-texts">
+          <span class="step-title">解密</span>
+          <span class="step-hint">用同一把密钥与 IV 还原明文 · GCM 篡改自动识别</span>
+        </div>
+        <span class="grow"></span>
+      </div>
+      <div class="block-head">
+        <label for="aesDecIv">IV（{{ dataFormatLabel }}，加密时返回的初始向量）</label>
+        <span class="grow"></span>
+      </div>
+      <input
+        id="aesDecIv"
+        v-model="decIv"
+        class="input"
+        style="font-family: var(--mono)"
+        placeholder="粘贴加密时返回的 IV"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div class="block-head" style="margin-top: 8px">
+        <label for="aesDecCipher">密文（{{ dataFormatLabel }}）</label>
+        <span class="grow"></span>
+        <button type="button" class="icon-btn" aria-label="复制明文" title="复制明文" :disabled="!decRes.ok" @click="copyText(decRes.data, '解密结果')">
+          <Icon name="copy" size="sm" />
+        </button>
+      </div>
+      <textarea
+        id="aesDecCipher"
+        v-model="decCipher"
+        class="textarea"
+        style="min-height: 64px"
+        placeholder="粘贴收到的密文；输入后自动解密"
+        spellcheck="false"
+      ></textarea>
+      <div class="alert" :hidden="!decRes.error" role="alert">
+        <Icon name="alert" />
+        <span>{{ decRes.error }}</span>
+      </div>
+      <div class="pane pane--text">
+        <div class="pane-scroll">
+          <div v-if="!decCipher.trim() || !key.trim() || !decIv.trim()" class="placeholder">① 的密钥就绪并粘贴密文与 IV 后，这里显示还原的明文。</div>
+          <span v-else-if="decRes.error">—</span>
+          <template v-else>{{ decRes.data }}</template>
+        </div>
+        <div class="pane-foot">
+          {{ decRes.ok ? `解密成功 · ${mode === 'GCM' ? 'GCM 已通过认证校验（内容未被篡改）' : 'CBC 还原完成'}` : '' }}
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* 长表单页：区块不参与 flex 压缩，超出部分交给 tool-body 自然滚动 */
+.tool-body > .block {
+  flex-shrink: 0;
+}
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: 1.6;
+}
+.guide b {
+  color: var(--fg);
+}
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 30px;
+  margin-bottom: var(--sp-8);
+  padding-bottom: var(--sp-8);
+  border-bottom: 1px solid var(--border);
+}
+.step-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+.step-texts {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+.step-title {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--fg);
+}
+.step-hint {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.iv-head {
+  margin-top: 6px;
+}
+.mono {
+  font-family: var(--mono);
+}
 .iv-text {
   font-family: var(--mono);
   font-size: var(--fs-12);
