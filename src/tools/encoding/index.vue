@@ -55,7 +55,11 @@ const res = computed(() => {
   }
   const r = encodeText(input.value, encoding.value, { bom: bom.value })
   if (!r.ok) return r
-  return { ok: true, data: format.value === 'b64' ? toB64(r.bytes) : toHex(r.bytes) }
+  return {
+    ok: true,
+    data: format.value === 'b64' ? toB64(r.bytes) : toHex(r.bytes),
+    byteLen: r.bytes.length,
+  }
 })
 const err = computed(() => (res.value.error ? res.value.error : ''))
 const out = computed(() => (res.value.ok ? res.value.data : ''))
@@ -69,8 +73,7 @@ const directionLabel = computed(() => {
 const stat = computed(() => {
   if (!input.value || !res.value.ok) return ''
   if (direction.value === 'decode') return `输入 ${res.value.byteLen ?? ''} 字节`
-  const bytes = new TextEncoder().encode(input.value).length
-  return `输入 UTF-8 ${bytes} B`
+  return `输出 ${res.value.byteLen ?? ''} 字节（${encodingLabel.value}）`
 })
 
 const byteExamples = computed(() =>

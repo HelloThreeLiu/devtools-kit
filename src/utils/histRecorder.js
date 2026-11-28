@@ -18,7 +18,10 @@ export function useHistRecorder(toolId, source, toOutput) {
       try {
         const output = await toOutput(v)
         if (my !== seq) return // 已有更新的输入，丢弃过期结果
-        if (output) recordHistory(toolId, v, output)
+        // source 为 getter 数组形式时，首元素是输入原文，其余为参与计算的附加状态
+        //（数组整体不可直接入库，否则被 String() 隐式 join 污染历史，见 W2 审查 I-1）
+        const input = Array.isArray(v) ? v[0] : v
+        if (output) recordHistory(toolId, input, output)
       } catch (e) {
         /* 计算或记录失败不落盘 */
       }

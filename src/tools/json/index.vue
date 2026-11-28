@@ -160,10 +160,10 @@ watch(input, (v) => {
 })
 const effectiveInput = computed(() => (byteLen(input.value) <= LARGE ? input.value : debouncedInput.value))
 
-/* 出错行摘录（行内错误附加说明） */
+/* 出错行摘录（行内错误附加说明）；仅 format 模式的结构化错误有 line/col（unescape 错误无行号，防御 NaN） */
 const excerpt = computed(() => {
   const e = err.value
-  if (!e) return null
+  if (!e || e.line === undefined) return null
   const text = input.value.split('\n')[e.line - 1] || ''
   const HALF = 40
   const start = Math.max(0, e.col - 1 - HALF)

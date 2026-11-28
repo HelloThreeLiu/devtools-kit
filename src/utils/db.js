@@ -82,15 +82,23 @@ function historyReady() {
   return historyCache.value !== null
 }
 
-/** 记录一条历史：1s 防抖落盘；与末条输入相同则跳过（PRD 4.7.1） */
+/** 记录一条历史：1s 防抖落盘；与末条输入+输出均相同则跳过，输入相同而输出不同则原地更新（如切换输出开关后重录，W2 审查 I-1） */
 export async function recordHistory(toolId, input, output) {
   await ensureHistory()
   const h = historyCache.value.history
   const sIn = String(input ?? '')
   if (!sIn) return
+  const sOut = String(output ?? '').slice(0, OUTPUT_CAP)
   const list = h[toolId] || []
-  if (list[0] && list[0].input === sIn) return
-  list.unshift({ input: sIn.slice(0, INPUT_CAP), output: String(output ?? '').slice(0, OUTPUT_CAP), ts: Date.now() })
+  if (list[0] && list[0].input === sIn) {
+    if (list[0].output === sOut) return
+    list[0] = { input: sIn.slice(0, INPUT_CAP), output: sOut, ts: Date.now() }
+    historyTick.value++
+    clearTimeout(flushTimers[toolId])
+    flushTimers[toolId] = setTimeout(() => flushHistory(), 1000)
+    return
+  }
+  list.unshift({ input: sIn.slice(0, INPUT_CAP), output: sOut, ts: Date.now() })
   h[toolId] = list.slice(0, HISTORY_CAP)
   historyTick.value++
   clearTimeout(flushTimers[toolId])

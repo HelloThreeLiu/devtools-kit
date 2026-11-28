@@ -50,9 +50,15 @@ export function decodeB32(str) {
   const body = raw.replace(/=+$/, '')
   if (!body) return { ok: false, error: '没有可解码的内容' }
 
+  // 逐字符校验原始字符（不能整串 toUpperCase 后再校验：ﬁ→FI、ß→SS 等长度展开
+  // 会把非法字符「幻影合法」并产生索引错位，W2 审查 M-2）
   const upper = body.toUpperCase()
-  for (let i = 0; i < upper.length; i++) {
-    if (!ALPHABET.includes(upper[i])) {
+  for (let i = 0; i < body.length; i++) {
+    const up = body[i].toUpperCase()
+    if (up.length !== 1 || !ALPHABET.includes(up)) {
+      if (body[i] === '=') {
+        return { ok: false, error: '补位符 = 只能出现在末尾（正文中间不允许出现）' }
+      }
       return {
         ok: false,
         error: `包含非法字符「${body[i]}」：Base32 仅支持 A–Z 和 2–7（不含 0、1、8、9）与补位符 =`,

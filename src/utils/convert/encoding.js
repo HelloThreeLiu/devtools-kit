@@ -122,9 +122,11 @@ export function encodeText(str, encodingId, opts = {}) {
 
 /* ---------- 解码（字节 → 文本） ---------- */
 
-/** Hex 输入容错：剥离空白 / 逗号 / 0x 前缀 */
+/** Hex 输入容错：剥离空白 / 逗号 / 0x 前缀（仅限串首或分隔符之后，避免静默改写中部内容，W2 审查 M-3） */
 function parseHex(input) {
-  const s = String(input ?? '').replace(/0x/gi, '').replace(/[\s,]/g, '')
+  const s = String(input ?? '')
+    .replace(/(^|[\s,])0[xX]/g, '$1')
+    .replace(/[\s,]/g, '')
   if (!s) return { ok: false, error: '没有可解码的内容' }
   if (!/^[0-9a-fA-F]+$/.test(s)) {
     const bad = [...s].find((c) => !/^[0-9a-fA-F]$/.test(c)) || ''
@@ -140,19 +142,29 @@ function parseHex(input) {
   return { ok: true, bytes }
 }
 
-/** Base64 → 字节（URL-Safe 容错 + padding 容错，与 base64.js 同策略但输出原始字节） */
+/** Base64 → 字节（URL-Safe 容错；补位符校验与 base64.js 同策略——只允许尾部 1–2 个且数量匹配，防静默截断，W2 审查 I-2） */
 function parseB64(input) {
-  let s = String(input ?? '').replace(/[\s\u200B-\u200D\u2060]/g, '')
+  const s = String(input ?? '').replace(/[\s\u200B-\u200D\u2060]/g, '')
   if (!s) return { ok: false, error: '没有可解码的内容' }
   const eq = s.indexOf('=')
   const body = (eq === -1 ? s : s.slice(0, eq)).replace(/-/g, '+').replace(/_/g, '/')
+  const pad = eq === -1 ? '' : s.slice(eq)
   if (!/^[A-Za-z0-9+/]*$/.test(body)) {
     return { ok: false, error: '包含非法字符：Base64 仅支持 A–Z a–z 0–9 + / - _ 和补位符 =' }
   }
+  if (pad && !/^={1,2}$/.test(pad)) {
+    return { ok: false, error: '补位符 = 只能出现在末尾，且最多 2 个' }
+  }
   const rem = body.length % 4
-  if (rem === 1) return { ok: false, error: '长度不合法：去掉补位符后的长度对 4 取余不能为 1' }
+  if (rem === 1) {
+    return { ok: false, error: '长度不合法：去掉补位符后的长度对 4 取余不能为 1' }
+  }
+  const expectPad = rem === 0 ? 0 : 4 - rem
+  if (pad.length && pad.length !== expectPad) {
+    return { ok: false, error: `长度不合法：当前内容长度需要 ${expectPad} 个补位符，实际 ${pad.length} 个` }
+  }
   try {
-    const bin = atob(body + '='.repeat(rem === 0 ? 0 : 4 - rem))
+    const bin = atob(body + '='.repeat(expectPad))
     const bytes = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
     return { ok: true, bytes }

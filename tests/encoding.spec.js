@@ -137,6 +137,24 @@ describe('字节输入解析（Hex / Base64）', () => {
     expect(decodeText('FF', 'gbk').ok).toBe(true)
   })
 
+  test('Base64 字节格式：中间/多余补位符不再静默截断（审查 I-2 回归）', () => {
+    expect(decodeText('5L2g=5aW9', 'utf8', { format: 'b64' }).ok).toBe(false)
+    expect(decodeText('aGVsbG8=x', 'utf8', { format: 'b64' }).ok).toBe(false)
+    expect(decodeText('aGVsbG8====', 'utf8', { format: 'b64' }).ok).toBe(false)
+    // 补位数量不匹配
+    expect(decodeText('aGVsbG8==', 'utf8', { format: 'b64' }).ok).toBe(false)
+    // 合法形式不受影响
+    expect(decodeText('aGVsbG8=', 'utf8', { format: 'b64' }).data).toBe('hello')
+    expect(decodeText('aGVsbG8', 'utf8', { format: 'b64' }).data).toBe('hello')
+  })
+
+  test('Hex 0x 前缀仅限串首或分隔符后（审查 M-3 回归）', () => {
+    expect(decodeText('0xC4,0xE3,0xBA,0xC3', 'gbk').data).toBe('你好')
+    expect(decodeText('  0xC4E3BAC3', 'gbk').data).toBe('你好')
+    // 中部 0x 不再被静默剥离
+    expect(decodeText('10x2', 'gbk').ok).toBe(false)
+  })
+
   test('乱码复原（可逆方向实测勘误：UTF-8 字节按 GBK 打开 → GBK 编回 → UTF-8 解码）', () => {
     // 勘误：计划 §3.3 原表述「GBK 字节按 UTF-8 打开后可复原」一般不可逆——
     // GBK 双字节大量组合（如 C4E3 的 E3）不是合法 UTF-8 序列，解码已产生 U+FFFD 丢失信息；

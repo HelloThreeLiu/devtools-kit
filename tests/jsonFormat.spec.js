@@ -229,4 +229,21 @@ describe('JSON 转义 / 去转义（R1.6）', () => {
     expect(unescapeJsonText('').ok).toBe(false)
     expect(unescapeJsonText('  ').ok).toBe(false)
   })
+
+  test('去转义：无引号模式保留首尾空格（审查 M-4 回归）', () => {
+    const esc = escapeJsonText('hello ', { quotes: false }).data
+    expect(unescapeJsonText(esc).data).toBe('hello ')
+    expect(unescapeJsonText(' a\\nb ').data).toBe(' a\nb ')
+    // 带引号时引号外空白视为排版噪音，引号内首尾空格保留
+    expect(unescapeJsonText('  "a b"  ').data).toBe('a b')
+  })
+
+  test('去转义：错误位置为原始输入下标（审查 M-5 回归）', () => {
+    // 带引号：原始串中 \ 在下标 3（引号占 0）
+    expect(unescapeJsonText('"ab\\x41"').error).toContain('位置 3')
+    // 无引号带前导空格：\ 在原始下标 4
+    expect(unescapeJsonText('  ab\\x41').error).toContain('位置 4')
+    // 无前缀场景不受影响
+    expect(unescapeJsonText('ab\\x41').error).toContain('位置 2')
+  })
 })

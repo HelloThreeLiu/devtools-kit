@@ -59,6 +59,18 @@ describe('Base32 解码（R1.7）', () => {
     expect(r.error).toContain('A–Z')
   })
 
+  test('中间补位符报错文案区分场景（审查 M-8）', () => {
+    const r = decodeB32('NBSW=Y3DP')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('只能出现在末尾')
+  })
+
+  test('大写展开字符（ﬁ→FI / ß→SS）不得幻影合法（审查 M-2）', () => {
+    expect(decodeB32('ﬁ').ok).toBe(false)
+    expect(decodeB32('ß').ok).toBe(false)
+    expect(decodeB32('ﬀ').ok).toBe(false)
+  })
+
   test('长度不合法报错（余 1/3/6）', () => {
     expect(decodeB32('A').ok).toBe(false)
     expect(decodeB32('ABC').ok).toBe(false)
@@ -67,13 +79,27 @@ describe('Base32 解码（R1.7）', () => {
     expect(decodeB32('ABCDEFG').ok).toBe(true) // 余 7 合法
   })
 
-  test('解码失败（非合法 UTF-8 结果）报错', () => {
-    // 'E///////' 解出高字节 0x80… 开头，非合法 UTF-8
-    expect(decodeB32('EA//////').ok).toBe(false)
+  test('解码失败：全合法字符但结果非合法 UTF-8（审查 M-6 修正：原用例实际失败于字符集）', () => {
+    // 'QQQQQQQQ' 全部在字母表内 → 解出 84 81 08 42 10（0x84 为非法 UTF-8 首字节）
+    const r = decodeB32('QQQQQQQQ')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('UTF-8')
   })
 
-  test('auto 无自动识别：解码方向显式指定', () => {
-    // 显式解码方向对普通文本也按 Base32 校验（与 Base64 的 auto 策略不同，R1.7 计划允许后置）
+  test('普通文本在显式解码方向按 Base32 校验并失败于 UTF-8 还原（无自动识别）', () => {
+    // 'hello world' 剥空格后 'helloworld' 字符集合法 → 最终失败于 UTF-8 校验而非字符集
     expect(decodeB32('hello world').ok).toBe(false)
+  })
+
+  test('余数 4/5 合法路径可解码（审查 M-7 补充）', () => {
+    expect(decodeB32('ABCD').ok).toBe(true) // 余 4 → 2 字节
+    expect(decodeB32('ABCDE').ok).toBe(true) // 余 5 → 3 字节
+    expect(decodeB32(encodeB32('ab', { padding: false }).data).data).toBe('ab')
+    expect(decodeB32(encodeB32('abc', { padding: false }).data).data).toBe('abc')
+  })
+
+  test('零宽字符剥离（审查 M-7 补充）', () => {
+    expect(decodeB32('NBSW\u200BY3DP').data).toBe('hello')
+    expect(decodeB32('NBSWY3DP\u2060').data).toBe('hello')
   })
 })

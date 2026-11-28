@@ -34,9 +34,10 @@ const modes = [
   { id: 'decode', label: '解码' },
 ]
 
-const res = computed(() =>
-  mode.value === 'decode' ? decodeB32(input.value) : encodeB32(input.value, { padding: !noPadding.value }),
-)
+const res = computed(() => {
+  if (!input.value) return { ok: false, empty: true }
+  return mode.value === 'decode' ? decodeB32(input.value) : encodeB32(input.value, { padding: !noPadding.value })
+})
 const err = computed(() => (res.value.error ? res.value.error : ''))
 const out = computed(() => (res.value.ok ? res.value.data : ''))
 
@@ -46,6 +47,7 @@ const directionLabel = computed(() =>
 
 const stat = computed(() => {
   if (!input.value || !res.value.ok) return ''
+  if (mode.value === 'decode') return `解码 ${res.value.byteLen ?? ''} 字节`
   const inBytes = new TextEncoder().encode(input.value).length
   return `输入 ${inBytes} B · 输出 ${out.value.length} 字符`
 })
