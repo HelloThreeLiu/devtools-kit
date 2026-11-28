@@ -133,8 +133,17 @@ describe('字节输入解析（Hex / Base64）', () => {
     expect(decodeText('C4', 'gbk').ok).toBe(false)
     // UTF-16 奇数字节 → fatal 抛错
     expect(decodeText('4F', 'utf16be').ok).toBe(false)
-    // 0xFF 平台映射为单字节字符（WHATWG gbk 表如此定义）→ 正常解码，不视为错误
-    expect(decodeText('FF', 'gbk').ok).toBe(true)
+    // 0xFF 是运行时行为分歧点：WHATWG（Chromium，即 uTools 宿主）与 Node 22
+    // 视为非法字节 fatal 抛错；新版 ICU（Node 24）映射为单字节字符 U+F8F5
+    // 正常解码。实测 CI（Node 22）与本地（Node 24）结论相反，
+    // 故只断言「不崩溃 + 结果形态完整」，不锁定具体平台行为
+    const res = decodeText('FF', 'gbk')
+    if (res.ok) {
+      expect(res.data.length).toBeGreaterThan(0)
+      expect(res.byteLen).toBe(1)
+    } else {
+      expect(res.error).toContain('解码失败')
+    }
   })
 
   test('Base64 字节格式：中间/多余补位符不再静默截断（审查 I-2 回归）', () => {
