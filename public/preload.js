@@ -137,6 +137,14 @@ window.services = {
     return rsaWrap(() => createPublicKey(String(privatePem)).export({ type: 'spki', format: 'pem' }).toString())
   },
 
+  /**
+   * 生成 RSA 密钥对（2048/4096；4096 耗时秒级，UI 需先显示 loading 再调用）
+   * @returns {{ publicKey: string, privateKey: string }} SPKI PEM / PKCS#8 PEM
+   */
+  rsaGenerateKeyPair(bits) {
+    return rsaGenerateKeyPair(bits)
+  },
+
   /** 公钥加密（OAEP-SHA256 默认 / PKCS#1 v1.5 可选）→ Base64 */
   rsaPublicEncrypt(publicPem, dataB64, padding) {
     return rsaWrap(() =>
