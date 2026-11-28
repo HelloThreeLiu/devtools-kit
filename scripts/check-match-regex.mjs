@@ -4,7 +4,7 @@ const cfg = JSON.parse(fs.readFileSync('public/plugin.json', 'utf-8'))
 
 const cases = {
   timestamp: {
-    hit: ['1735689600', '1735689600000', '1234567890123'],
+    hit: ['12345678', '999999999', '1735689600', '1735689600000', '1234567890123'],
     miss: ['12345', '0', 'abc', '2025-01-01', '-1735689600'],
   },
   'url-codec': {

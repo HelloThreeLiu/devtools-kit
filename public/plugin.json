@@ -21,8 +21,8 @@
         {
           "type": "regex",
           "label": "时间戳转换",
-          "match": "/^\\d{10,13}$/",
-          "minLength": 10,
+          "match": "/^\\d{8,13}$/",
+          "minLength": 8,
           "maxLength": 13
         }
       ]

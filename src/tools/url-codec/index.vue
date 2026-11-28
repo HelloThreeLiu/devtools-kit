@@ -1,7 +1,9 @@
 <script setup>
 /**
- * URL 编解码（PRD 4.3.3）
- * 解码 / Component 编码 / URI 编码；完整 URL 额外给出结构化解析
+ * URL 编解码（PRD 4.3.3；R1.1 智能模式 + 宽容解码）
+ * 解码（宽容模式，非法 % 序列按字面保留并提示）/
+ * 编码智能模式（http(s):// 开头走 encodeURI，其余全编码）/ Component / URI；
+ * 完整 URL 额外给出结构化解析
  */
 import { computed, onMounted, ref } from 'vue'
 import Icon from '../../components/Icon.vue'
@@ -14,7 +16,7 @@ import { consumeEnterPayload } from '../../router.js'
 
 const input = ref('')
 const inputEl = ref(null)
-const mode = ref('decode') // decode | component | uri
+const mode = ref('decode') // decode | smart | component | uri
 
 useReplay('url-codec', (v) => (input.value = String(v ?? '')))
 
@@ -29,6 +31,7 @@ useMainResult(() => (out.value ? { value: out.value, label: '结果' } : null))
 
 const modes = [
   { id: 'decode', label: '解码' },
+  { id: 'smart', label: '编码 · 智能' },
   { id: 'component', label: '编码 · Component' },
   { id: 'uri', label: '编码 · URI' },
 ]
@@ -39,12 +42,18 @@ const res = computed(() => {
 })
 const err = computed(() => res.value.error || '')
 const out = computed(() => (res.value.ok ? res.value.data : ''))
+const partial = computed(() => res.value.partial === true)
 
 const parsed = computed(() => parseUrl(input.value))
 
-const directionLabel = computed(() =>
-  input.value ? (mode.value === 'decode' ? '解码' : '编码') : '—',
-)
+const directionLabel = computed(() => {
+  if (!input.value) return '—'
+  if (mode.value === 'decode') return '解码'
+  if (mode.value === 'smart') {
+    return res.value.resolvedMode === 'uri' ? '智能 → encodeURI' : '智能 → Component'
+  }
+  return '编码'
+})
 
 onMounted(() => {
   const p = consumeEnterPayload()
@@ -80,7 +89,7 @@ onMounted(() => {
         v-model="input"
         class="textarea"
         style="min-height: 72px"
-        placeholder="输入 URL 或含 % 转义的文本&#10;完整 URL（https://…）会额外解析出协议、主机与参数表"
+        placeholder="输入 URL 或含 % 转义的文本&#10;编码 · 智能模式：http(s):// 开头保留 URL 结构，其余全编码&#10;完整 URL 会额外解析出协议、主机与参数表"
         spellcheck="false"
       ></textarea>
       <div class="alert" :hidden="!err" role="alert">
@@ -92,6 +101,11 @@ onMounted(() => {
     <div class="block">
       <div class="block-head">
         <span>结果</span>
+        <span
+          v-if="partial"
+          class="tag"
+          title="非法的 % 序列已按原文保留，其余内容正常解码"
+        >部分内容无法解码</span>
         <span class="grow"></span>
         <button type="button" class="btn btn--ghost" :disabled="!out" @click="copyText(out, '结果')">
           <Icon name="copy" size="sm" />复制

@@ -20,6 +20,51 @@ describe('Base64 编码（PRD 4.3.2）', () => {
     expect(decodeB64('5L2g5aW9==').ok).toBe(false) // 已完整编码再补 = 属非法输入，正确拒绝
   })
 
+  test('解码前剥离全部空白字符（R1.2：PEM / 邮件折叠排版）', () => {
+    expect(decodeB64('aG Vs bG8=').data).toBe('hello')
+    expect(decodeB64('aGVsbG8\n=\n').data).toBe('hello')
+    expect(decodeB64('aGVs\tbG8=\r\n').data).toBe('hello')
+    // 邮件折叠排版：每 76 字符换行
+    const long = encodeB64('你好，DevTools Kit！'.repeat(20)).data
+    const folded = (long.match(/.{1,24}/g) || []).join('\n')
+    expect(decodeB64(folded).data).toBe('你好，DevTools Kit！'.repeat(20))
+  })
+
+  test('auto 方向：含换行的合法 Base64 仍识别为解码（R1.2）', () => {
+    const r = convertBase64('5L2g\n5aW9', 'auto')
+    expect(r.direction).toBe('decode')
+    expect(r.data).toBe('你好')
+  })
+
+  test('Base64URL 输出开关（R1.2：+/ → -_ 、去 padding）', () => {
+    expect(encodeB64('hello', { urlSafe: true }).data).toBe('aGVsbG8')
+    expect(encodeB64('你好', { urlSafe: true }).data).toBe('5L2g5aW9')
+    // 'a¾/𝀀' 的标准 Base64 必含 + 和 /
+    const src = 'a¾/𝀀'
+    const std = encodeB64(src).data
+    expect(std.includes('+')).toBe(true)
+    expect(std.includes('/')).toBe(true)
+    const urlSafe = encodeB64(src, { urlSafe: true }).data
+    expect(urlSafe).not.toBe(std)
+    expect(urlSafe.includes('+')).toBe(false)
+    expect(urlSafe.includes('/')).toBe(false)
+    expect(urlSafe.includes('=')).toBe(false)
+    // URL-Safe 输出可直接解码（解码侧始终容错）
+    expect(decodeB64(urlSafe).data).toBe(src)
+  })
+
+  test('convertBase64 透传 urlSafe 选项', () => {
+    const r = convertBase64('hello', 'encode', { urlSafe: true })
+    expect(r.data).toBe('aGVsbG8')
+    expect(decodeB64(r.data).data).toBe('hello')
+  })
+
+  test('解码失败文案含排查引导（R1.2）', () => {
+    const r2 = decodeB64('+++++BEGIN CERTIFICATE+++++')
+    expect(r2.ok).toBe(false)
+    expect(r2.error).toContain('不可见字符')
+  })
+
   test('非法字符报错', () => {
     const r = decodeB64('ab!c')
     expect(r.ok).toBe(false)

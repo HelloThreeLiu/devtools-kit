@@ -5,8 +5,17 @@ import { toast } from './toast.js'
  * 复制文本 + 轻提示（PRD 4.2-2）
  * uTools 环境：utools.copyText；浏览器调试：Clipboard API → execCommand 降级
  */
+
+/**
+ * 复制前统一规整：去首尾空白/换行，杜绝隐形字符进入剪贴板
+ * （R1.1 反馈修复：UUID 复制带隐形回车；全工具复制路径均经此出口）
+ */
+export function normalizeCopyText(text) {
+  return text == null ? '' : String(text).trim()
+}
+
 export async function copyText(text, label = '') {
-  const val = text == null ? '' : String(text)
+  const val = normalizeCopyText(text)
   if (!val) {
     toast('没有可复制的内容')
     return false

@@ -15,12 +15,13 @@ import { consumeEnterPayload } from '../../router.js'
 const input = ref('')
 const inputEl = ref(null)
 const mode = ref('auto') // auto | encode | decode
+const urlSafe = ref(false) // R1.2：Base64URL 输出（+/ → -_ 、去 padding）
 
 useReplay('base64', (v) => (input.value = String(v ?? '')))
 
 /* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
 useHistRecorder('base64', input, (v) => {
-  const r = convertBase64(v, mode.value)
+  const r = convertBase64(v, mode.value, { urlSafe: urlSafe.value })
   return r.ok ? r.data : null
 })
 
@@ -33,9 +34,10 @@ const modes = [
   { id: 'decode', label: '解码' },
 ]
 
-const res = computed(() => convertBase64(input.value, mode.value))
+const res = computed(() => convertBase64(input.value, mode.value, { urlSafe: urlSafe.value }))
 const err = computed(() => (res.value.error ? res.value.error : ''))
 const out = computed(() => (res.value.ok ? res.value.data : ''))
+const isEncodeOut = computed(() => res.value.direction === 'encode')
 
 const directionLabel = computed(() => {
   if (!input.value) return '—'
@@ -74,6 +76,15 @@ onMounted(() => {
           @click="setMode(m.id)"
         >
           {{ m.label }}
+        </button>
+        <button
+          v-if="isEncodeOut"
+          type="button"
+          :aria-pressed="urlSafe"
+          title="输出 URL-Safe 变体：+/ 替换为 -_，去掉填充符 =（解码方向始终兼容两种格式）"
+          @click="urlSafe = !urlSafe"
+        >
+          Base64URL 输出
         </button>
       </div>
 
