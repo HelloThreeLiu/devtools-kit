@@ -12,6 +12,7 @@ import {
   SIZE_WARN_BYTES,
   UNKNOWN_MIME,
   analyzeDecodeInput,
+  asReplayPayload,
   buildDataUrl,
   extFromMime,
   formatBytes,
@@ -29,17 +30,21 @@ import { consumeEnterPayload } from '../../router.js'
 const direction = ref('encode') // encode | decode
 const inputEl = ref(null)
 
-useReplay('file-b64', (v) => {
-  const s = String(v ?? '')
-  // 编码方向历史是文件名，无法回放文件；Data URL / Base64 形态回填解码方向
-  if (/^data:/i.test(s) || /^[A-Za-z0-9+/=\s]{20,}$/.test(s)) {
+/** 历史/入站载荷回填判定（文件名类输入返回空串，W3 审查 I-1） */
+function fillFromPayload(v) {
+  const s = asReplayPayload(v)
+  if (s) {
     direction.value = 'decode'
     decodeInput.value = s
   }
-})
+}
 
-/* 解码历史：停顿 1s 写入（编码方向事件驱动，单独直记，见 encodeFile） */
-useHistRecorder('file-b64', () => (direction.value === 'decode' ? decodeInput.value : ''), (v) => {
+useReplay('file-b64', fillFromPayload)
+
+/* 解码历史：停顿 1s 写入（编码方向事件驱动，单独直记，见 encodeFile）。
+   监听 effectiveInput：大输入只有防抖后的值参与，避免历史重录时再跑一次全量分析（W3 审查 M-5） */
+useHistRecorder('file-b64', () => (direction.value === 'decode' ? effectiveInput.value : ''), (v) => {
+  if (v.length > 4800) return null // 超 db 存储截断长度（5000）的输入不记录：回放必然破损（W3 审查 M-4）
   const r = analyzeDecodeInput(v)
   return r.ok ? `${r.mime} · ${formatBytes(r.byteLen)}` : null
 })
@@ -64,6 +69,14 @@ const fileError = ref('')
 const dragging = ref(false)
 const fileInputEl = ref(null)
 
+/* 大文本显示截断（W3 审查 I-4）：1MB 起 DOM 全量渲染即秒级冻结，复制路径始终取完整内容 */
+const DISPLAY_CAP = 40000
+
+const displayB64 = computed(() => (enc.value ? enc.value.base64.slice(0, DISPLAY_CAP) : ''))
+const displayDataUrl = computed(() => (enc.value ? enc.value.dataUrl.slice(0, DISPLAY_CAP) : ''))
+
+let encodeSeq = 0 // 编码并发竞态防护：仅最后一次选择的结果生效（W3 审查 M-7）
+
 function pickFile() {
   fileInputEl.value?.click()
 }
@@ -74,7 +87,20 @@ function onFileChange(e) {
   e.target.value = '' // 允许重复选择同一文件
 }
 
+function onDragEnter() {
+  dragDepth++
+  dragging.value = true
+}
+
+function onDragLeave() {
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (!dragDepth) dragging.value = false
+}
+
+let dragDepth = 0
+
 function onDrop(e) {
+  dragDepth = 0
   dragging.value = false
   const f = e.dataTransfer.files && e.dataTransfer.files[0]
   if (f) encodeFile(f)
@@ -82,9 +108,11 @@ function onDrop(e) {
 
 function encodeFile(f) {
   fileError.value = ''
+  const my = ++encodeSeq
   const mime = mimeFromExt(f.name) || f.type || UNKNOWN_MIME
   const reader = new FileReader()
   reader.onload = () => {
+    if (my !== encodeSeq) return // 已选择更新的文件，丢弃过期结果
     const raw = String(reader.result || '')
     const base64 = raw.slice(raw.indexOf(',') + 1)
     enc.value = {
@@ -98,6 +126,7 @@ function encodeFile(f) {
     recordHistory('file-b64', f.name, `${mime} · ${formatBytes(f.size)}`)
   }
   reader.onerror = () => {
+    if (my !== encodeSeq) return
     fileError.value = '文件读取失败，请重试'
   }
   reader.readAsDataURL(f)
@@ -170,11 +199,8 @@ const decodeExamples = [
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
 ]
 
-const placeholderText = computed(() =>
-  direction.value === 'decode'
-    ? '粘贴 Data URL（data:image/png;base64,…）或裸 Base64，自动识别 MIME 并预览'
-    : '点击选择文件，或把文件拖入上方区域',
-)
+const placeholderText =
+  '粘贴 Data URL（data:image/png;base64,…）或裸 Base64，自动识别 MIME 并预览'
 
 function clearInput() {
   if (direction.value === 'decode') {
@@ -188,13 +214,7 @@ function clearInput() {
 
 onMounted(() => {
   const p = consumeEnterPayload()
-  if (p) {
-    const s = String(p)
-    if (/^data:/i.test(s) || /^[A-Za-z0-9+/=\s]{20,}$/.test(s)) {
-      direction.value = 'decode'
-      decodeInput.value = s
-    }
-  }
+  if (p) fillFromPayload(String(p))
   inputEl.value?.focus()
 })
 
@@ -229,8 +249,9 @@ onUnmounted(() => {
           @click="pickFile"
           @keydown.enter="pickFile"
           @keydown.space.prevent="pickFile"
-          @dragover.prevent="dragging = true"
-          @dragleave="dragging = false"
+          @dragenter.prevent="onDragEnter"
+          @dragover.prevent
+          @dragleave="onDragLeave"
           @drop.prevent="onDrop"
         >
           <Icon name="image" />
@@ -294,7 +315,10 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="pane pane--text">
-          <div class="pane-scroll"><span class="mono">{{ enc.dataUrl }}</span></div>
+          <div class="pane-scroll"><span class="mono">{{ displayDataUrl }}</span></div>
+          <div v-if="enc.dataUrl.length > displayDataUrl.length" class="pane-foot">
+            大内容已截断显示 · 共 {{ enc.dataUrl.length }} 字符（复制仍为完整内容）
+          </div>
         </div>
       </div>
       <div class="block">
@@ -306,8 +330,10 @@ onUnmounted(() => {
           </button>
         </div>
         <div class="pane pane--text">
-          <div class="pane-scroll"><span class="mono">{{ enc.base64 }}</span></div>
-          <div class="pane-foot">Base64 长度 {{ enc.base64.length }} 字符</div>
+          <div class="pane-scroll"><span class="mono">{{ displayB64 }}</span></div>
+          <div class="pane-foot">
+            Base64 长度 {{ enc.base64.length }} 字符{{ enc.base64.length > displayB64.length ? '（大内容已截断显示，复制仍为完整内容）' : '' }}
+          </div>
         </div>
       </div>
     </div>
@@ -319,27 +345,29 @@ onUnmounted(() => {
         <span v-if="dec.ok" class="tag" :title="`识别方式：${sourceLabel}`">{{ dec.mime }}</span>
         <span v-if="dec.ok" class="tag">{{ formatBytes(dec.byteLen) }}</span>
         <span v-if="dec.ok && !dec.known" class="tag">未识别到已知格式（按 {{ UNKNOWN_MIME }} 处理）</span>
+        <span v-if="dec.ok && dec.byteLen > SIZE_WARN_BYTES" class="tag tag--err">
+          <Icon name="alert" size="xs" />超过 10 MB，继续操作可能卡顿
+        </span>
         <span class="grow"></span>
-        <template v-if="dec.ok && previewOk">
-          <button
-            v-if="copyImgSupported"
-            type="button"
-            class="btn btn--ghost"
-            title="复制图片到系统剪贴板"
-            @click="onCopyImage"
-          >
-            <Icon name="copy" size="sm" />复制图片
-          </button>
-          <button
-            v-if="saveSupported"
-            type="button"
-            class="btn btn--ghost"
-            title="保存为文件"
-            @click="onSaveFile"
-          >
-            <Icon name="download" size="sm" />另存为
-          </button>
-        </template>
+        <!-- 另存为对任意格式可用（W3 审查 I-3）；复制图片仅图片可预览时提供 -->
+        <button
+          v-if="dec.ok && saveSupported"
+          type="button"
+          class="btn btn--ghost"
+          title="保存为文件"
+          @click="onSaveFile"
+        >
+          <Icon name="download" size="sm" />另存为
+        </button>
+        <button
+          v-if="dec.ok && previewOk && copyImgSupported"
+          type="button"
+          class="btn btn--ghost"
+          title="复制图片到系统剪贴板"
+          @click="onCopyImage"
+        >
+          <Icon name="copy" size="sm" />复制图片
+        </button>
       </div>
       <div v-if="dec.ok" class="pane">
         <div class="pane-scroll preview-wrap">
@@ -400,6 +428,7 @@ onUnmounted(() => {
   max-width: 100%;
   max-height: 320px;
   border-radius: var(--radius);
-  background: var(--checker, conic-gradient(#8888 25%, transparent 0 50%, #8888 0 75%, transparent 0) 0 0 / 16px 16px);
+  /* 透明区域棋盘格底衬 */
+  background: conic-gradient(#8888 25%, transparent 0 50%, #8888 0 75%, transparent 0) 0 0 / 16px 16px;
 }
 </style>
