@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   byteLen,
+  buildRenderRows,
   computeFolds,
   escapeJsonText,
   formatJson,
@@ -170,6 +171,90 @@ describe('高亮与折叠', () => {
     const m = computeFolds(lines)
     expect(m.get(0)).toBe(5)
     expect(m.get(1)).toBe(4)
+  })
+})
+
+describe('行渲染模型 buildRenderRows（W4 真机反馈：3MB 折叠展开错乱回归）', () => {
+  const LINES = [
+    '[',
+    '  {',
+    '    "x": 113.47,',
+    '  },',
+    '  {',
+    '    "x": 113.47,',
+    '  },',
+    '  {',
+    '    "x": 113.47,',
+    '  }',
+    ']',
+  ]
+  const folds = computeFolds(LINES)
+
+  test('展开态：行号连续、每个节点起始行 foldable（含根数组）', () => {
+    const rows = buildRenderRows(LINES, folds, new Set(), highlightJson)
+    expect(rows.map((r) => r.no)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    // 可折叠起始行：根数组（行 1）+ 三个对象（行 2/5/8）
+    expect(rows.filter((r) => r.foldable).map((r) => r.no)).toEqual([1, 2, 5, 8])
+    expect(rows.every((r) => !r.folded)).toBe(true)
+  })
+
+  test('折叠态：标记行行号 = 起始行（回归：此前显示为收尾行 + 1）', () => {
+    const collapsed = new Set([1]) // 折叠 0-based 1（行 2 的对象，2→4）
+    const rows = buildRenderRows(LINES, folds, collapsed, highlightJson)
+    const marker = rows.find((r) => r.folded)
+    expect(marker.no).toBe(2) // 起始行；此前错显为 4（收尾行 + 1）
+    expect(marker.opener).toBe(1)
+    expect(marker.close).toBe(3)
+    // 隐藏 2 行（0-based 2），收尾行内联显示
+    expect(rows.map((r) => r.no)).toEqual([1, 2, 5, 6, 7, 8, 9, 10, 11])
+  })
+
+  test('折叠标记行点击展开：按 opener 定位而非显示行号（真机反馈缺陷回归）', () => {
+    const collapsed = new Set([1]) // 折叠 0-based 1（行 2 的对象，2→4）
+    const rows = buildRenderRows(LINES, folds, collapsed, highlightJson)
+    const marker = rows.find((r) => r.folded)
+    // 模拟 toggleFold(row)：folded 行按 opener 定位
+    const idx = marker.folded ? marker.opener : marker.no - 1
+    expect(idx).toBe(1)
+    // 修复前的错误定位：broken 版本标记 no = close + 1 = 4，按 4 - 1 = 3 定位
+    // → 命中 0-based 3（收尾行），而非真正的起始行 1
+    expect(marker.close + 1 - 1).toBe(3)
+    expect(idx).not.toBe(marker.close + 1 - 1)
+  })
+
+  test('相邻对象各自折叠互不干扰（连续共享边界行的密集结构）', () => {
+    const collapsed = new Set([1, 4]) // 行 2 与行 5 的对象分别折叠
+    const rows = buildRenderRows(LINES, folds, collapsed, highlightJson)
+    const markers = rows.filter((r) => r.folded)
+    expect(markers.length).toBe(2)
+    expect(markers[0].no).toBe(2)
+    expect(markers[1].no).toBe(5)
+    // 两个标记行各自内联收尾，第 3 个对象未折叠正常展开
+    expect(rows.map((r) => r.no)).toEqual([1, 2, 5, 8, 9, 10, 11])
+  })
+
+  test('截断边界：未闭合的起始行不产生折叠标记', () => {
+    const truncated = LINES.slice(0, 6) // 在对象内部截断
+    const rows = buildRenderRows(truncated, computeFolds(truncated), new Set(), highlightJson)
+    expect(rows.every((r) => !r.folded)).toBe(true)
+    expect(rows.every((r) => r.no === r.opener + 1)).toBe(true)
+  })
+
+  test('大文件规模：1250 个连续对象（5000 行）折叠切换正确', () => {
+    const big = ['[']
+    for (let i = 0; i < 1250; i++) {
+      big.push('  {', '    "x": 1.5,', '    "y": 2.5,', '    "z": 3.5', i < 1249 ? '  },' : '  }')
+    }
+    big.push(']')
+    const f = computeFolds(big)
+    // 排除根数组（0 → 末行），只折叠对象节点
+    const allFolded = new Set([...f.keys()].filter((k) => k > 0))
+    const rows = buildRenderRows(big, f, allFolded, highlightJson)
+    expect(rows.length).toBe(1250 + 2) // 1250 个折叠标记行 + [ 与 ]
+    expect(rows[0].no).toBe(1)
+    expect(rows[rows.length - 1].no).toBe(big.length)
+    // 每个标记行行号 = 起始行 + 1
+    expect(rows.slice(1, -1).every((r, i) => r.no === r.opener + 1 && r.folded)).toBe(true)
   })
 })
 

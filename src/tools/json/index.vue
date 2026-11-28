@@ -8,6 +8,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
 import {
   byteLen,
+  buildRenderRows,
   computeFolds,
   escapeJsonText,
   formatJson,
@@ -83,24 +84,20 @@ const placeholderText = computed(() => {
   return '粘贴 JSON 后自动格式化、校验并定位语法错误'
 })
 
-/** 渲染行模型：折叠行内联为「… N 行」标记 */
-const renderRows = computed(() => {
-  const rows = []
-  const shownLines = shown.value
-  const single = shownLines.length === 1
-  for (let i = 0; i < shownLines.length; i++) {
-    const isOpen = !single && folds.value.has(i)
-    const folded = isOpen && collapsed.value.has(i)
-    let code = highlightJson(shownLines[i])
-    if (folded) {
-      const close = folds.value.get(i)
-      code += `<span class="fold-mark">… ${close - i - 1} 行</span><span class="ln-code-bracket">${highlightJson(shownLines[close].trim())}</span>`
-      i = close
-    }
-    rows.push({ no: i + 1, code, foldable: isOpen, folded })
+/** 单行高亮缓存：折叠切换只重排受影响行，3MB 级文件切换不再整页重高亮（W4 真机反馈） */
+const hlCache = new Map()
+function highlightCached(line) {
+  let html = hlCache.get(line)
+  if (html === undefined) {
+    html = highlightJson(line)
+    if (hlCache.size > 20000) hlCache.clear()
+    hlCache.set(line, html)
   }
-  return rows
-})
+  return html
+}
+
+/** 渲染行模型（纯函数 buildRenderRows，可单测；折叠标记行 no/opener = 起始行） */
+const renderRows = computed(() => buildRenderRows(shown.value, folds.value, collapsed.value, highlightCached))
 
 const rootText = computed(() =>
   mode.value === 'format' && result.value.ok ? `根节点：${rootSummary(result.value.parsed)}` : '',
@@ -112,8 +109,10 @@ function setMode(id) {
   mode.value = id
 }
 
-function toggleFold(no) {
-  const idx = no - 1
+function toggleFold(row) {
+  // 折叠标记行的 no/opener 都是起始行；历史实现按「显示行号 - 1」定位，
+  // 在标记行上开合会命中错误节点（W4 真机反馈：3MB JSON 折叠展开错乱的根因）
+  const idx = row.folded ? row.opener : row.no - 1
   const set = new Set(collapsed.value)
   set.has(idx) ? set.delete(idx) : set.add(idx)
   collapsed.value = set
@@ -349,7 +348,7 @@ onUnmounted(() => {
                 :aria-expanded="!row.folded"
                 :aria-label="`${row.folded ? '展开' : '折叠'}第 ${row.no} 行`"
                 :title="row.folded ? '展开' : '折叠'"
-                @click="toggleFold(row.no)"
+                @click="toggleFold(row)"
               >
                 <Icon name="chevron-right" size="xs" />
               </button>

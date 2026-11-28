@@ -244,12 +244,44 @@ export function computeFolds(lines) {
   return map
 }
 
+/**
+ * 行渲染模型（W4 真机反馈重构：此前内联在组件中，存在两个缺陷——
+ * 1) 折叠标记行的行号显示为「收尾行 + 1」（i = close 先于 no 计算执行）；
+ * 2) 折叠态点击展开按「显示行号 - 1」定位，实际开合了错误的节点，大文件下错乱明显。
+ * 现返回结构化行模型：no/opener 均为起始行；折叠行携带 opener 供精确开合。
+ * @param {string[]} lines 展示行（已截断）
+ * @param {Map<number,number>} folds 起始行下标 → 结束行下标
+ * @param {Set<number>} collapsed 已折叠的起始行下标集合
+ * @param {(line: string) => string} highlightLine 单行高亮函数（注入以便组件层做缓存）
+ * @returns {Array<{ no:number, opener:number, close:number, code:string, foldable:boolean, folded:boolean }>}
+ */
+export function buildRenderRows(lines, folds, collapsed, highlightLine) {
+  const rows = []
+  const single = lines.length === 1
+  for (let i = 0; i < lines.length; i++) {
+    const isOpen = !single && folds.has(i)
+    const folded = isOpen && collapsed.has(i)
+    let code = highlightLine(lines[i])
+    let close = -1
+    if (folded) {
+      close = folds.get(i)
+      code += `<span class="fold-mark">… ${close - i - 1} 行</span><span class="ln-code-bracket">${highlightLine(lines[close].trim())}</span>`
+    }
+    // no 在 i 跳转之前取值：折叠标记行显示起始行号（而非收尾行）
+    rows.push({ no: i + 1, opener: i, close, code, foldable: isOpen, folded })
+    if (folded) i = close
+  }
+  return rows
+}
+
 /** 根节点描述（对象键数 / 数组项数 / 类型名） */
 export function rootSummary(parsed) {
   if (Array.isArray(parsed)) return `${parsed.length} 项的数组`
   if (parsed && typeof parsed === 'object') return `${Object.keys(parsed).length} 个键的对象`
   return parsed === null ? 'null' : typeof parsed
 }
+
+/** 根节点描述（对象键数 / 数组项数 / 类型名） */
 
 /* ---------- JSON 转义 / 去转义（R1.6） ---------- */
 
