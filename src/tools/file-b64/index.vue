@@ -294,10 +294,10 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <!-- 编码结果 -->
-    <div v-if="direction === 'encode' && enc" class="block">
+    <!-- 编码结果（block--fill 约束高度：pane 内部滚动，避免压缩编码区造成遮挡） -->
+    <div v-if="direction === 'encode' && enc" class="block block--fill">
       <div class="block-head">
-        <span class="tag">{{ enc.name }}</span>
+        <span class="tag name-tag" :title="enc.name">{{ enc.name }}</span>
         <span class="tag">{{ enc.mime }}</span>
         <span class="tag">{{ formatBytes(enc.size) }}</span>
         <span v-if="enc.tooLarge" class="tag tag--err">
@@ -306,7 +306,7 @@ onUnmounted(() => {
         <span class="grow"></span>
         <button type="button" class="btn btn--ghost" @click="clearInput">清除</button>
       </div>
-      <div class="block">
+      <div class="block block--fill">
         <div class="block-head">
           <span>Data URL</span>
           <span class="grow"></span>
@@ -321,7 +321,7 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      <div class="block">
+      <div class="block block--fill">
         <div class="block-head">
           <span>纯 Base64</span>
           <span class="grow"></span>
@@ -387,6 +387,7 @@ onUnmounted(() => {
 
 <style scoped>
 .drop-zone {
+  flex: none; /* 防止结果区溢出时被 flex 压缩（内容溢出会造成遮挡） */
   margin-top: 8px;
   padding: 22px 16px;
   border: 1.5px dashed var(--border);
@@ -408,12 +409,18 @@ onUnmounted(() => {
 }
 .drop-zone.is-dragging {
   border-color: var(--accent);
-  background: var(--accent-weak, rgba(30, 128, 255, 0.08));
+  background: var(--accent-weak);
   color: var(--fg);
 }
 .drop-hint {
   font-size: var(--fs-12);
   color: var(--muted);
+}
+/* 文件名过长时省略，避免挤出「清除」按钮（block-head 定高 nowrap） */
+.name-tag {
+  max-width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .mono {
   word-break: break-all;
