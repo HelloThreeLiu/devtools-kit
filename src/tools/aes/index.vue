@@ -91,6 +91,14 @@ const directionLabel = computed(() =>
 
 const dataFormatLabel = computed(() => (dataFormat.value === 'hex' ? 'Hex' : 'Base64'))
 
+/** 结果区脚注：按模式给出准确说明（CBC 无认证标签，W4 修正——此前 GCM 文案在 CBC 下错误显示） */
+const footText = computed(() => {
+  if (!res.value.ok || direction.value !== 'encrypt') return ''
+  return mode.value === 'GCM'
+    ? `GCM 认证标签已随密文返回（尾部 16 字节）· ${dataFormatLabel.value} 格式`
+    : `CBC · PKCS#7 填充（密文长度为 16 字节的倍数）· ${dataFormatLabel.value} 格式`
+})
+
 /* 随机密钥：记住原始字节，切换密钥格式时自动重编码（手动编辑后解除绑定） */
 let generatedKeyBytes = null
 function onKeyInput() {
@@ -256,9 +264,7 @@ onMounted(() => {
           <span v-else-if="err">—</span>
           <template v-else>{{ out }}</template>
         </div>
-        <div class="pane-foot">
-          {{ res.ok && direction === 'encrypt' ? `GCM 认证标签已随密文返回（尾部 16 字节）· ${dataFormatLabel} 格式` : '' }}
-        </div>
+        <div class="pane-foot">{{ footText }}</div>
       </div>
     </div>
   </div>
