@@ -57,4 +57,9 @@ export default {
     memory.setItem(HS_KEY, JSON.stringify(data))
     return true
   },
+
+  /** 另存为在浏览器调试模式不可用（UI 按环境隐藏入口），此处仅兜底 */
+  saveFile() {
+    throw new Error('浏览器调试模式不支持保存文件')
+  },
 }

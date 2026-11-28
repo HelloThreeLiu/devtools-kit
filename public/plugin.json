@@ -38,6 +38,11 @@
       "cmds": ["base32", "Base32转码", "base32编码"]
     },
     {
+      "code": "file-b64",
+      "description": "图片/文件转 Base64 / Data URL，支持预览与另存为",
+      "cmds": ["图片转Base64", "文件转Base64", "base64图片", "file2b64"]
+    },
+    {
       "code": "url-codec",
       "description": "URL 编码解码与查询参数解析",
       "cmds": [

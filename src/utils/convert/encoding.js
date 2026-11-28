@@ -142,8 +142,9 @@ function parseHex(input) {
   return { ok: true, bytes }
 }
 
-/** Base64 → 字节（URL-Safe 容错；补位符校验与 base64.js 同策略——只允许尾部 1–2 个且数量匹配，防静默截断，W2 审查 I-2） */
-function parseB64(input) {
+/** Base64 → 字节（URL-Safe 容错；补位符校验与 base64.js 同策略——只允许尾部 1–2 个且数量匹配，防静默截断，W2 审查 I-2）
+ *  导出供 fileB64.js（R1.5）复用同一严格校验 */
+export function parseB64(input) {
   const s = String(input ?? '').replace(/[\s\u200B-\u200D\u2060]/g, '')
   if (!s) return { ok: false, error: '没有可解码的内容' }
   const eq = s.indexOf('=')

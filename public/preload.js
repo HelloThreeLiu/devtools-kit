@@ -54,4 +54,16 @@ window.services = {
     writeHistory(data)
     return true
   },
+
+  /**
+   * 保存文件（R1.5 另存为：前端经 utools.showSaveDialog 取得路径后落盘）
+   * @param {string} filePath 绝对路径（来自宿主保存对话框）
+   * @param {string} base64 文件内容的 Base64（不含 Data URL 前缀）
+   * @returns {boolean}
+   */
+  saveFile(filePath, base64) {
+    if (typeof filePath !== 'string' || !filePath) throw new Error('缺少保存路径')
+    fs.writeFileSync(filePath, Buffer.from(String(base64 || ''), 'base64'))
+    return true
+  },
 }

@@ -1,7 +1,7 @@
 /* 临时脚本：核对工具的 payload 预填接入完整性 */
 const fs = require('fs')
 const files = [
-  'timestamp', 'base64', 'base32', 'url-codec', 'json', 'radix', 'date-calc',
+  'timestamp', 'base64', 'base32', 'file-b64', 'url-codec', 'json', 'radix', 'date-calc',
   'hash', 'color', 'unicode', 'encoding', 'case-convert', 'text-stat', 'qrcode',
 ]
 let bad = []

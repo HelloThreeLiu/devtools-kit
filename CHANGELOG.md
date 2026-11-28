@@ -29,6 +29,15 @@
   字节以 Hex / Base64 展示与输入，UTF-16 可选 BOM；GBK 编码采用运行时构建的
   逆向映射表（零依赖，码表与平台解码器一致）；经典乱码（UTF-8 按 GBK 打开的 浣犲ソ）
   一键复原。
+- 新工具「图片/文件转 Base64」（R1.5，反馈热度第一）：
+  - 编码：选择 / 拖入任意文件 → Base64 与 Data URL（MIME 按扩展名推断，
+    png / jpg / jpeg / gif / webp / svg / bmp / ico，未知按 application/octet-stream），
+    超过 10 MB 给出体积警告；
+  - 解码：粘贴 Data URL 或裸 Base64 → 自动识别格式（前缀解析 + 魔数嗅探，
+    含 SVG 文本特征识别）→ 图片预览（棋盘格底衬）；
+  - 复制图片（`utools.copyImage`，官方支持 Data URL 直入）与另存为
+    （`utools.showSaveDialog` + preload 保存动作）；
+  - webp / svg 按 Data URL 正确 MIME 渲染，无需转码；大输入粘贴 200ms 防抖。
 
 ### 增强
 

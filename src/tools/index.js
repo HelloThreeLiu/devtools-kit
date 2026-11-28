@@ -6,6 +6,7 @@
 import TimestampTool from './timestamp/index.vue'
 import Base64Tool from './base64/index.vue'
 import Base32Tool from './base32/index.vue'
+import FileB64Tool from './file-b64/index.vue'
 import UrlCodecTool from './url-codec/index.vue'
 import JsonTool from './json/index.vue'
 import RadixTool from './radix/index.vue'
@@ -79,6 +80,18 @@ export const tools = [
     cmds: ['base32', 'Base32转码', 'base32编码'],
     keywords: 'encode decode 编码 解码 rfc4648',
     component: Base32Tool,
+  },
+  {
+    id: 'file-b64',
+    code: 'file-b64',
+    name: '图片/文件转 Base64',
+    description: '图片与任意文件转 Base64 / Data URL，支持预览、复制图片与另存为',
+    icon: 'image',
+    category: 'codec',
+    priority: 'P0',
+    cmds: ['图片转Base64', '文件转Base64', 'base64图片', 'file2b64'],
+    keywords: '图片 base64 data url 文件 预览 另存 复制图片',
+    component: FileB64Tool,
   },
   {
     id: 'url-codec',
