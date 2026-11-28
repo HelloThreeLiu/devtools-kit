@@ -2,10 +2,12 @@ import { describe, expect, test } from 'vitest'
 import {
   byteLen,
   computeFolds,
+  escapeJsonText,
   formatJson,
   highlightJson,
   lint,
   rootSummary,
+  unescapeJsonText,
 } from '../src/utils/convert/jsonFormat.js'
 
 const esc = (s) => s
@@ -168,5 +170,63 @@ describe('高亮与折叠', () => {
     const m = computeFolds(lines)
     expect(m.get(0)).toBe(5)
     expect(m.get(1)).toBe(4)
+  })
+})
+
+describe('JSON 转义 / 去转义（R1.6）', () => {
+  test('转义：中英混排 + 引号 + 换行（计划验收样例）', () => {
+    expect(escapeJsonText('他说:"hi"').data).toBe('"他说:\\"hi\\""')
+    expect(escapeJsonText('a\nb\tc').data).toBe('"a\\nb\\tc"')
+  })
+
+  test('转义：可选去外层引号', () => {
+    expect(escapeJsonText('他说:"hi"', { quotes: false }).data).toBe('他说:\\"hi\\"')
+    expect(escapeJsonText('hi', { quotes: false }).data).toBe('hi')
+    expect(escapeJsonText('hi').data).toBe('"hi"')
+  })
+
+  test('转义：控制字符与 Emoji（stringify 保留 Emoji 原字符，转义孤立代理对）', () => {
+    expect(escapeJsonText('😀').data).toBe('"😀"')
+    expect(escapeJsonText('a\u0001b').data).toBe('"a\\u0001b"')
+    expect(escapeJsonText('\uD800').data).toBe('"\\ud800"')
+  })
+
+  test('去转义：带外层引号容错（含 \\uXXXX 还原中文）', () => {
+    expect(unescapeJsonText('"\\u4f60"').data).toBe('你')
+    expect(unescapeJsonText('\\u4f60\\u597d').data).toBe('你好')
+  })
+
+  test('去转义：往返一致（中英混排 + 引号 + 换行）', () => {
+    const src = '他说:"hi"\n第二行\t制表符\\反斜杠/斜杠'
+    const esc = escapeJsonText(src, { quotes: false }).data
+    expect(unescapeJsonText(esc).data).toBe(src)
+    const escQ = escapeJsonText(src).data
+    expect(unescapeJsonText(escQ).data).toBe(src)
+  })
+
+  test('去转义：全部转义规则', () => {
+    expect(unescapeJsonText('a\\nb\\tc\\rd\\"e\\\\f\\/g\\bh\\fi').data).toBe('a\nb\tc\rd"e\\f/g\bh\fi')
+  })
+
+  test('去转义：非法转义序列报错并给出位置', () => {
+    const r = unescapeJsonText('abc\\x41def')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('位置 3')
+    expect(r.error).toContain('\\x')
+  })
+
+  test('去转义：\\u 后不足 4 位报错', () => {
+    const r = unescapeJsonText('\\u4f')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('4 位十六进制')
+  })
+
+  test('去转义：孤立代理对按字面还原不崩溃', () => {
+    expect(unescapeJsonText('\\ud800').data).toBe('\ud800')
+  })
+
+  test('去转义：空输入报错', () => {
+    expect(unescapeJsonText('').ok).toBe(false)
+    expect(unescapeJsonText('  ').ok).toBe(false)
   })
 })

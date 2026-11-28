@@ -5,6 +5,7 @@
  */
 import TimestampTool from './timestamp/index.vue'
 import Base64Tool from './base64/index.vue'
+import Base32Tool from './base32/index.vue'
 import UrlCodecTool from './url-codec/index.vue'
 import JsonTool from './json/index.vue'
 import RadixTool from './radix/index.vue'
@@ -12,6 +13,7 @@ import UuidTool from './uuid/index.vue'
 import DateCalcTool from './date-calc/index.vue'
 import HashTool from './hash/index.vue'
 import UnicodeTool from './unicode/index.vue'
+import EncodingTool from './encoding/index.vue'
 import CaseConvertTool from './case-convert/index.vue'
 import TextStatTool from './text-stat/index.vue'
 import QrcodeTool from './qrcode/index.vue'
@@ -65,6 +67,18 @@ export const tools = [
     cmds: ['base64', 'Base64转码', 'base64编码'],
     keywords: 'encode decode 编码 解码 b64',
     component: Base64Tool,
+  },
+  {
+    id: 'base32',
+    code: 'base32',
+    name: 'Base32 编解码',
+    description: 'RFC 4648 Base32 编解码，UTF-8 安全',
+    icon: 'base64',
+    category: 'codec',
+    priority: 'P1',
+    cmds: ['base32', 'Base32转码', 'base32编码'],
+    keywords: 'encode decode 编码 解码 rfc4648',
+    component: Base32Tool,
   },
   {
     id: 'url-codec',
@@ -125,6 +139,18 @@ export const tools = [
     cmds: ['unicode', 'unicode转中文'],
     keywords: '转义 实体 u4f60',
     component: UnicodeTool,
+  },
+  {
+    id: 'encoding',
+    code: 'encoding',
+    name: '字符编码转换',
+    description: 'GBK / UTF-8 / UTF-16 字节与文本互转，乱码复原',
+    icon: 'languages',
+    category: 'codec',
+    priority: 'P1',
+    cmds: ['编码转换', 'GBK', '乱码', 'encoding'],
+    keywords: '字符集 utf16 乱码修复 字节 hex gbk编码 gbk解码',
+    component: EncodingTool,
   },
   {
     id: 'date-calc',

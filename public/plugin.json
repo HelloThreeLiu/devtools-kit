@@ -33,6 +33,11 @@
       "cmds": ["base64", "Base64转码", "base64编码"]
     },
     {
+      "code": "base32",
+      "description": "RFC 4648 Base32 编码与解码",
+      "cmds": ["base32", "Base32转码", "base32编码"]
+    },
+    {
       "code": "url-codec",
       "description": "URL 编码解码与查询参数解析",
       "cmds": [
@@ -99,6 +104,11 @@
       "code": "unicode",
       "description": "Unicode 转义序列与中文互转",
       "cmds": ["unicode", "unicode转中文"]
+    },
+    {
+      "code": "encoding",
+      "description": "GBK / UTF-8 / UTF-16 编码转换与乱码复原",
+      "cmds": ["编码转换", "GBK", "乱码", "encoding"]
     },
     {
       "code": "case-convert",

@@ -250,3 +250,81 @@ export function rootSummary(parsed) {
   if (parsed && typeof parsed === 'object') return `${Object.keys(parsed).length} 个键的对象`
   return parsed === null ? 'null' : typeof parsed
 }
+
+/* ---------- JSON 转义 / 去转义（R1.6） ---------- */
+
+/**
+ * 转义：任意文本 → JSON 字符串字面量
+ * 采用 JSON.stringify 的字面量语义（控制字符 / 代理对 / 中文处理与 JSON 标准一致），
+ * quotes = false 时去掉外层双引号，只留转义体。
+ * @param {string} str
+ * @param {{ quotes?: boolean }} [opts]
+ * @returns {{ ok:true, data:string }}
+ */
+export function escapeJsonText(str, opts = {}) {
+  const lit = JSON.stringify(String(str ?? ''))
+  return { ok: true, data: opts.quotes === false ? lit.slice(1, -1) : lit }
+}
+
+/**
+ * 去转义：转义串 → 原文
+ * 容错接受带 / 不带外层引号；非严格 JSON 转义按 \n \t \r \" \\ \/ \b \f \uXXXX 规则手工还原，
+ * 非法转义序列报错并给出字符位置（下标从 0 起，与「定位」语义一致）。
+ * @param {string} str
+ * @returns {{ ok:true, data:string, hadQuotes:boolean } | { ok:false, error:string }}
+ */
+export function unescapeJsonText(str) {
+  const raw = String(str ?? '').trim()
+  if (!raw) return { ok: false, error: '没有可去转义的内容' }
+
+  // 容错：接受带/不带外层引号（仅当首尾均为 " 时剥离）
+  let s = raw
+  let hadQuotes = false
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+    s = s.slice(1, -1)
+    hadQuotes = true
+  }
+
+  let out = ''
+  let i = 0
+  while (i < s.length) {
+    const c = s[i]
+    if (c !== '\\') {
+      out += c
+      i += 1
+      continue
+    }
+    const e = s[i + 1]
+    if (e === undefined) {
+      return { ok: false, error: `位置 ${i}：转义符 \\ 后没有内容（转义不完整）` }
+    }
+    switch (e) {
+      case '"': out += '"'; i += 2; break
+      case '\\': out += '\\'; i += 2; break
+      case '/': out += '/'; i += 2; break
+      case 'b': out += '\b'; i += 2; break
+      case 'f': out += '\f'; i += 2; break
+      case 'n': out += '\n'; i += 2; break
+      case 'r': out += '\r'; i += 2; break
+      case 't': out += '\t'; i += 2; break
+      case 'u': {
+        const hex = s.slice(i + 2, i + 6)
+        if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
+          return {
+            ok: false,
+            error: `位置 ${i}：\\u 后需要 4 位十六进制数，收到「${hex || '（内容结束）'}」`,
+          }
+        }
+        out += String.fromCharCode(parseInt(hex, 16))
+        i += 6
+        break
+      }
+      default:
+        return {
+          ok: false,
+          error: `位置 ${i}：无效的转义序列 \\${e}（仅支持 \\n \\t \\r \\" \\\\ \\/ \\b \\f \\uXXXX）`,
+        }
+    }
+  }
+  return { ok: true, data: out, hadQuotes }
+}
