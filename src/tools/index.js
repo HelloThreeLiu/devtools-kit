@@ -28,6 +28,7 @@ export const MAIN_CODE = 'devtools-kit'
 /** 工具分类（主界面页签） */
 export const CATEGORIES = [
   { id: 'codec', name: '编解码' },
+  { id: 'crypto', name: '加解密' },
   { id: 'datetime', name: '时间日期' },
   { id: 'text', name: '文本生成' },
   { id: 'design', name: '设计辅助' },
@@ -149,7 +150,7 @@ export const tools = [
     name: 'AES 加解密',
     description: 'AES-CBC / GCM 对称加解密，密钥一键生成',
     icon: 'lock',
-    category: 'codec',
+    category: 'crypto',
     priority: 'P1',
     cmds: ['AES加密', 'AES解密', 'AES', 'aes'],
     keywords: '对称加密 cbc gcm 加密 解密 密钥',
@@ -161,7 +162,7 @@ export const tools = [
     name: 'RSA 加解密',
     description: 'RSA 密钥对、加解密与签名验签',
     icon: 'key',
-    category: 'codec',
+    category: 'crypto',
     priority: 'P1',
     cmds: ['RSA加密', 'RSA解密', 'RSA', 'rsa'],
     keywords: '非对称加密 公钥 私钥 签名 验签 pem',

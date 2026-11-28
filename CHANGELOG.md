@@ -38,6 +38,8 @@
   - 复制图片（`utools.copyImage`，官方支持 Data URL 直入）与另存为
     （`utools.showSaveDialog` + preload 保存动作）；
   - webp / svg 按 Data URL 正确 MIME 渲染，无需转码；大输入粘贴 200ms 防抖。
+- 主界面新增「加解密」分类页签：AES / RSA 两个加解密工具从「编解码」移入，
+  与单向哈希（保留在编解码）语义分离；后续加密类工具将归入此分类。
 - 新工具「AES 加解密」（R2.5，自 v1.2 提前交付）：
   - CBC（默认，PKCS#7，与 OpenSSL 互验）/ GCM（推荐，认证标签随密文返回）；
   - 密钥 128 / 192 / 256 位一键随机生成（crypto.getRandomValues），Hex / Base64 格式可切换；
