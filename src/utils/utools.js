@@ -10,3 +10,15 @@ export const inUtoolsEnv = typeof window !== 'undefined' && !!window.utools
 
 export const utools = inUtoolsEnv ? window.utools : mockUtools
 export const services = inUtoolsEnv ? window.services || {} : mockServices
+
+/** 诊断信息：当前装载的 preload 构建标记与可用动作清单（排查渲染/preload 版本偏差用） */
+export const servicesInfo = (() => {
+  const s = inUtoolsEnv ? window.services || {} : mockServices
+  return {
+    buildTag: inUtoolsEnv ? String(s.__buildTag || '未标记（v1.2 之前的旧版 preload）') : String(s.__buildTag || 'mock'),
+    methods: Object.keys(s)
+      .filter((k) => typeof s[k] === 'function')
+      .sort()
+      .join(', '),
+  }
+})()

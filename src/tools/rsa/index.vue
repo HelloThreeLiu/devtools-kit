@@ -11,7 +11,7 @@ import Icon from '../../components/Icon.vue'
 import { RSA_BITS, validatePem } from '../../utils/convert/rsa.js'
 import { copyText } from '../../utils/clipboard.js'
 import { toast } from '../../utils/toast.js'
-import { services } from '../../utils/utools.js'
+import { services, servicesInfo } from '../../utils/utools.js'
 import { useHistRecorder } from '../../utils/histRecorder.js'
 import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
@@ -219,7 +219,13 @@ onMounted(() => {
     <!-- preload 版本过旧提示（v1.2 批次新增能力需要重新装载插件生效） -->
     <div v-if="!rsaReady" class="alert" role="alert">
       <Icon name="alert" />
-      <div class="alert-body">{{ PRELOAD_STALE_MSG }}</div>
+      <div class="alert-body">
+        {{ PRELOAD_STALE_MSG }}
+        <div style="margin-top: 4px; font-family: var(--mono); font-size: var(--fs-12)">
+          诊断：当前 preload 构建标记 = {{ servicesInfo.buildTag }}；可用动作 = {{ servicesInfo.methods || '（无）' }}。
+          请核对 uTools 开发者面板中本插件绑定的目录是否为仓库的 <b>dist</b> 目录（该目录下 preload.js 应含 rsaGenerateKeyPair）。
+        </div>
+      </div>
     </div>
 
     <!-- 密钥对生成 -->

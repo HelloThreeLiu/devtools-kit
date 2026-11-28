@@ -69,6 +69,7 @@ function readHistory() {
 
 export default {
   __mock: true,
+  __buildTag: 'mock-browser',
 
   async hash(text, algo) {
     const t = String(text ?? '')
