@@ -75,6 +75,11 @@ watch([text, key, ivInput, direction, mode, keyFormat, dataFormat], async () => 
   if (direction.value === 'encrypt') {
     r = await aesEncrypt({ key: key.value, keyFormat: keyFormat.value, mode: mode.value, plaintext: text.value, output: dataFormat.value })
   } else {
+    // IV 未输入属于「待补全」而非格式错误，给出指引性提示（W4 审查 M-10）
+    if (!ivInput.value.trim()) {
+      res.value = { ok: false, error: '请输入加密时返回的 IV（上方结果区可直接复制）' }
+      return
+    }
     r = await aesDecrypt({ key: key.value, keyFormat: keyFormat.value, mode: mode.value, iv: ivInput.value, cipher: text.value, inputFormat: dataFormat.value })
   }
   if (my !== seq) return
@@ -84,6 +89,11 @@ watch([text, key, ivInput, direction, mode, keyFormat, dataFormat], async () => 
 const err = computed(() => (res.value.error ? res.value.error : ''))
 const out = computed(() => (res.value.ok ? res.value.data : ''))
 const outIv = computed(() => (res.value.ok && res.value.iv ? res.value.iv : ''))
+
+/* 切到解密方向时自动回填刚生成的 IV，免去手动复制（W4 审查建议 1） */
+watch(direction, (d, old) => {
+  if (d === 'decrypt' && old === 'encrypt' && outIv.value && !ivInput.value) ivInput.value = outIv.value
+})
 
 const directionLabel = computed(() =>
   !text.value.trim() ? '—' : direction.value === 'encrypt' ? `明文 → 密文（AES-${mode.value}）` : `密文 → 明文（AES-${mode.value}）`,

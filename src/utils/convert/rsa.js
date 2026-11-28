@@ -5,8 +5,9 @@
  */
 
 const PEM_RES = {
-  public: /^-----BEGIN (?:RSA )?PUBLIC KEY-----\n(?:[A-Za-z0-9+/=\r\n]+)-----END (?:RSA )?PUBLIC KEY-----\s*$/,
-  private: /^-----BEGIN (?:RSA )?PRIVATE KEY-----\n(?:[A-Za-z0-9+/=\r\n]+)-----END (?:RSA )?PRIVATE KEY-----\s*$/,
+  // 头行分隔容忍 \r\n（Windows 剪贴板/记事本粘贴形态，W4 审查 I-4）；前瞻确保正文至少含 1 个 Base64 字符（拒绝空骨架，M-3）
+  public: /^-----BEGIN (?:RSA )?PUBLIC KEY-----\r?\n(?=[A-Za-z0-9+/=])(?:[A-Za-z0-9+/=\r\n]+)-----END (?:RSA )?PUBLIC KEY-----\s*$/,
+  private: /^-----BEGIN (?:RSA )?PRIVATE KEY-----\r?\n(?=[A-Za-z0-9+/=])(?:[A-Za-z0-9+/=\r\n]+)-----END (?:RSA )?PRIVATE KEY-----\s*$/,
 }
 
 export const RSA_BITS = [2048, 4096]
@@ -22,6 +23,14 @@ export function validatePem(pem, kind) {
   if (!m) return { ok: false, error: '不是 PEM 格式：缺少 -----BEGIN …----- 头' }
   if (!s.includes('-----END')) return { ok: false, error: 'PEM 不完整：缺少 -----END …----- 尾（内容可能被截断）' }
   if (!PEM_RES[kind].test(s)) {
+    // 头尾标签与要求一致但整体未通过 → 问题出在正文/换行，给出可操作的原因而非自相矛盾的类型提示（W4 审查 I-4）
+    const labelPairOk =
+      kind === 'public'
+        ? /-----BEGIN (?:RSA )?PUBLIC KEY-----/.test(s) && /-----END (?:RSA )?PUBLIC KEY-----/.test(s)
+        : /-----BEGIN (?:RSA )?PRIVATE KEY-----/.test(s) && /-----END (?:RSA )?PRIVATE KEY-----/.test(s)
+    if (labelPairOk) {
+      return { ok: false, error: 'PEM 正文不合法：头尾之间仅允许 Base64 字符与换行，请检查是否混入乱码字符或复制不完整' }
+    }
     const isPrivatePasted = /PRIVATE/.test(m[1])
     return {
       ok: false,

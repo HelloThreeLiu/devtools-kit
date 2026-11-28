@@ -81,6 +81,30 @@ describe('preload RSA 功能冒烟（node:crypto 真实路径）', () => {
     expect(services.hash('abc', 'md5')).toMatch(/^[0-9a-f]{32}$/)
   })
 
+  test('动作清单与 services-mock 一致（两侧共同演进，防漏挂回归——真机 rsaGenerateKeyPair 缺口即此模式）', async () => {
+    const mock = await import('../src/utils/services-mock.js')
+    const preloadMethods = Object.keys(services)
+      .filter((k) => typeof services[k] === 'function')
+      .sort()
+    const mockMethods = Object.keys(mock.default)
+      .filter((k) => typeof mock.default[k] === 'function')
+      .sort()
+    expect(preloadMethods).toEqual(mockMethods)
+    expect(preloadMethods).toContain('rsaGenerateKeyPair') // 真机缺口专项盯防
+  })
+
+  test('明文超长给出准确指引而非误导性密钥错误（审查 I-1 回归）', () => {
+    const kp = services.rsaGenerateKeyPair(2048)
+    const big = Buffer.from('a'.repeat(300), 'utf-8').toString('base64')
+    expect(() => services.rsaPublicEncrypt(kp.publicKey, big, 'oaep')).toThrow('明文超长')
+    expect(() => services.rsaPublicEncrypt(kp.publicKey, Buffer.from('a'.repeat(100)).toString('base64'), 'oaep')).not.toThrow()
+  })
+
+  test('未知哈希显式抛错（审查 M-6）', () => {
+    const kp = services.rsaGenerateKeyPair(2048)
+    expect(() => services.rsaSign(kp.privateKey, 'x', 'sha512')).toThrow('不支持的哈希算法')
+  })
+
   test('非法输入走统一友好错误', () => {
     expect(() => services.rsaPublicEncrypt('not a pem', 'AAAA', 'oaep')).toThrow('RSA 操作失败')
   })

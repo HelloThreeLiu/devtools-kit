@@ -76,6 +76,22 @@ const pubSig = ref('') // 验签签名输入
 const pubRes = ref({ ok: false, empty: true }) // 加密结果
 const verifyRes = ref(null) // true / false / null
 
+/* RSA 单块加密上限：最大支持 4096 位密钥（OAEP-SHA256）约 470 字节明文，超限提前给出准确指引（W4 审查 I-1） */
+const RSA_PLAIN_MAX = 470
+
+function utf8ToB64(text) {
+  const bytes = new TextEncoder().encode(text)
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  return btoa(bin)
+}
+
+/* 验签结论跟随数据失效：改签名或哈希后旧结论不得继续展示（W4 审查 I-2） */
+watch([pubSig, pubHash], () => {
+  verifyRes.value = null
+})
+
 let seq = 0
 watch([pubPem, pubPlain, pubMode], async () => {
   const my = ++seq
@@ -92,8 +108,16 @@ watch([pubPem, pubPlain, pubMode], async () => {
     pubRes.value = { ok: false, error: pubErr.value }
     return
   }
+  const byteLen = new TextEncoder().encode(pubPlain.value).length
+  if (byteLen > RSA_PLAIN_MAX) {
+    pubRes.value = {
+      ok: false,
+      error: `明文超长（${byteLen} 字节）：RSA 单块加密受密钥长度限制（RSA-2048 约 190 字节、4096 约 470 字节），请缩短明文或改用 AES 加密`,
+    }
+    return
+  }
   try {
-    const dataB64 = btoa(String.fromCharCode(...new TextEncoder().encode(pubPlain.value)))
+    const dataB64 = utf8ToB64(pubPlain.value)
     const r = await services.rsaPublicEncrypt(pubPem.value, dataB64, pubMode.value)
     if (my !== seq) return
     pubRes.value = { ok: true, data: r }
@@ -126,6 +150,7 @@ const priText = ref('') // 解密输出
 const priData = ref('') // 签名原文输入
 const priHash = ref('sha256')
 const priSig = ref('') // 签名输出
+const priSigHash = ref('') // 签名产出时的哈希（展示用，随产出固化）
 const priDecRes = ref({ ok: false, empty: true })
 const signing = ref(false)
 
@@ -165,12 +190,22 @@ async function onSign() {
   signing.value = true
   try {
     priSig.value = await services.rsaSign(priPem.value, priData.value, priHash.value)
+    priSigHash.value = priHash.value // 固化生成时哈希，标签随产出而非随当前选择（W4 审查 I-3）
   } catch (e) {
     toast('签名失败：' + (e?.message || '未知原因'))
   } finally {
     signing.value = false
   }
 }
+
+/* 结果失效联动（W4 审查 I-2/I-3）：改签名或哈希后旧验签结论不得继续展示；密钥/原文/哈希变化使旧签名失效 */
+watch([pubSig, pubHash], () => {
+  verifyRes.value = null
+})
+watch([priPem, priData, priHash], () => {
+  priSig.value = ''
+  priSigHash.value = ''
+})
 
 /* ---------- 历史与主结果 ---------- */
 
@@ -355,7 +390,7 @@ onMounted(() => {
           <button type="button" :aria-pressed="pubHash === 'sha1'" @click="pubHash = 'sha1'">SHA-1</button>
         </div>
         <span class="grow"></span>
-        <button type="button" class="btn btn--ghost" :disabled="pubErr || !pubPlain.trim() || !pubSig.trim()" @click="onVerify">验证签名</button>
+        <button type="button" class="btn btn--ghost" :disabled="!rsaReady || pubErr || !pubPlain.trim() || !pubSig.trim()" @click="onVerify">验证签名</button>
         <span v-if="verifyRes === true" class="tag tag--ok">验签通过</span>
         <span v-else-if="verifyRes === false" class="tag tag--err">验签失败（内容或签名被篡改，或密钥/哈希不匹配）</span>
       </div>
@@ -435,7 +470,7 @@ onMounted(() => {
         spellcheck="false"
       ></textarea>
       <div class="block-head" v-if="priSig">
-        <span class="tag">签名已生成（Base64 · {{ priHash.toUpperCase() }}）</span>
+        <span class="tag">签名已生成（Base64 · {{ priSigHash.toUpperCase() }}）</span>
         <span class="grow"></span>
         <button type="button" class="btn btn--ghost" @click="copyText(priSig, '签名')">
           <Icon name="copy" size="sm" />复制签名

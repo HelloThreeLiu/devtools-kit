@@ -24,6 +24,11 @@ describe('密钥生成（R2.5）', () => {
     expect(r.key).toBeInstanceOf(Uint8Array)
     expect(r.key.length).toBe(16)
   })
+
+  test('非法位数显式抛错（审查 M-7）', () => {
+    expect(() => generateAesKey(512)).toThrow('不支持的 AES 密钥长度')
+    expect(() => generateAesKey(100)).toThrow('不支持的 AES 密钥长度')
+  })
 })
 
 describe('AES-CBC 加解密（与 node:crypto / OpenSSL 互验）', () => {
@@ -110,6 +115,23 @@ describe('错误处理（验收：错误密钥友好提示不崩溃）', () => {
     const r = await aesEncrypt({ key: 'aabbcc', mode: 'CBC', plaintext: 'x' })
     expect(r.ok).toBe(false)
     expect(r.error).toContain('密钥长度不合法')
+  })
+
+  test('超 122KB 输入不再栈溢出，可正常加解密（审查 I-6 回归）', async () => {
+    const big = 'x'.repeat(130 * 1024) // 曾触发 String.fromCharCode spread 栈溢出
+    const k = generateAesKey(256, 'hex').key
+    const enc = await aesEncrypt({ key: k, mode: 'CBC', plaintext: big })
+    expect(enc.ok).toBe(true)
+    const dec = await aesDecrypt({ key: k, mode: 'CBC', iv: enc.iv, cipher: enc.data, inputFormat: 'base64' })
+    expect(dec.ok).toBe(true)
+    expect(dec.data).toBe(big)
+  })
+
+  test('明文超 1 MB 给出分段指引（审查 I-6 软上限）', async () => {
+    const k = generateAesKey(256, 'hex').key
+    const r = await aesEncrypt({ key: k, mode: 'CBC', plaintext: 'a'.repeat(1024 * 1024 + 1) })
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('超过 1 MB')
   })
 
   test('IV 长度非法报错（CBC 需要 16 字节）', async () => {

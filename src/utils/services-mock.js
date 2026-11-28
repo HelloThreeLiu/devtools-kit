@@ -7,6 +7,9 @@
  */
 import { md5Hex } from './md5.js'
 
+/* 与 preload 的 RSA_HASHES 对齐：RSA 签名/验签仅支持 SHA-256 / SHA-1，未知哈希显式抛错（W4 审查 M-6） */
+const RSA_HASH_NAMES = { sha1: 'SHA-1', sha256: 'SHA-256' }
+/* 哈希工具 mock 用：digest 支持 SHA 全系 */
 const SHA_NAMES = { sha1: 'SHA-1', sha256: 'SHA-256', sha512: 'SHA-512' }
 
 /* ---------- RSA mock（WebCrypto）：与 preload 行为对齐（OAEP-SHA256 / PKCS#1 v1.5 / RSASSA-PKCS1-v1_5） ---------- */
@@ -19,9 +22,11 @@ function pemEncode(label, der) {
   return `-----BEGIN ${label}-----\n${lines.join('\n')}\n-----END ${label}-----`
 }
 
-function pemDecode(pem, label) {
-  const s = String(pem ?? '')
-  const body = s.replace(new RegExp(`-----(BEGIN|END) ${label}-----`, 'g'), '').replace(/\s+/g, '')
+/** 剥离 PEM 头尾与空白（容忍 PKCS#1 旧形态 BEGIN RSA PRIVATE KEY，与 preload 行为对齐，W4 审查 M-2） */
+function pemDecode(pem) {
+  const body = String(pem ?? '')
+    .replace(/-----(?:BEGIN|END) (?:RSA )?(?:PUBLIC|PRIVATE) KEY-----/g, '')
+    .replace(/\s+/g, '')
   if (!/^[A-Za-z0-9+/=]+$/.test(body) || body.length < 100) throw new Error('PEM 格式不正确')
   return Uint8Array.from(atob(body), (c) => c.charCodeAt(0))
 }
@@ -121,7 +126,7 @@ export default {
       (async () => {
         const key = await crypto.subtle.importKey(
           'spki',
-          pemDecode(publicPem, 'PUBLIC KEY'),
+          pemDecode(publicPem),
           alg === 'RSA-OAEP' ? { name: alg, hash: 'SHA-256' } : { name: alg },
           false,
           ['encrypt'],
@@ -140,7 +145,7 @@ export default {
       (async () => {
         const key = await crypto.subtle.importKey(
           'pkcs8',
-          pemDecode(privatePem, 'PRIVATE KEY'),
+          pemDecode(privatePem),
           alg === 'RSA-OAEP' ? { name: alg, hash: 'SHA-256' } : { name: alg },
           false,
           ['decrypt'],
@@ -154,12 +159,13 @@ export default {
   },
 
   async rsaSign(privatePem, data, hash) {
-    const name = SHA_NAMES[hash] || 'SHA-256'
+    const name = RSA_HASH_NAMES[hash]
+    if (!name) throw new Error('不支持的哈希算法：' + hash + '（仅支持 SHA-256 / SHA-1）')
     return rsaWrapAsync(
       (async () => {
         const key = await crypto.subtle.importKey(
           'pkcs8',
-          pemDecode(privatePem, 'PRIVATE KEY'),
+          pemDecode(privatePem),
           { name: 'RSASSA-PKCS1-v1_5', hash: name },
           false,
           ['sign'],
@@ -171,12 +177,13 @@ export default {
   },
 
   async rsaVerify(publicPem, data, sigB64, hash) {
-    const name = SHA_NAMES[hash] || 'SHA-256'
+    const name = RSA_HASH_NAMES[hash]
+    if (!name) throw new Error('不支持的哈希算法：' + hash + '（仅支持 SHA-256 / SHA-1）')
     return rsaWrapAsync(
       (async () => {
         const key = await crypto.subtle.importKey(
           'spki',
-          pemDecode(publicPem, 'PUBLIC KEY'),
+          pemDecode(publicPem),
           { name: 'RSASSA-PKCS1-v1_5', hash: name },
           false,
           ['verify'],

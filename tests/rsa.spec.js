@@ -5,8 +5,8 @@ import { validatePem } from '../src/utils/convert/rsa.js'
 
 /* RSA 测试策略：mock（WebCrypto）在 Node ≥20 可直接运行；
    并与 node:crypto（OpenSSL 后端，即 preload 的实现基座）交叉互验 PEM 格式正确性。
-   注：Node 的 WebCrypto 不含 RSAES-PKCS1-v1_5，该分支仅在 Chromium（含 uTools 渲染进程）可用，
-   测试环境按支持情况跳过。 */
+   注：RSAES-PKCS1-v1_5 已随规范从现代 Chromium 与 Node 的 WebCrypto 中移除（仅老内核可用），
+   该分支在测试环境恒跳过；uTools 内 PKCS#1 由 preload node:crypto 承担，功能无损。 */
 const PKCS1_SUPPORTED = await crypto.subtle
   .importKey('spki', new Uint8Array(0), { name: 'RSAES-PKCS1-v1_5' }, false, ['encrypt'])
   .then(() => true)
@@ -15,11 +15,30 @@ const PKCS1_SUPPORTED = await crypto.subtle
 describe('PEM 校验（R2.8：粘贴任意 PEM 均先校验并给出具体原因）', () => {
   const PUB = `-----BEGIN PUBLIC KEY-----\nMFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKxP4fHv\n-----END PUBLIC KEY-----`
   const PRI = `-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----`
+  const PUB_CRLF = PUB.split('\n').join('\r\n')
 
   test('合法形态通过', () => {
     expect(validatePem(PUB, 'public').ok).toBe(true)
     expect(validatePem(PRI, 'private').ok).toBe(true)
     expect(validatePem(`  ${PRI}  \n`, 'private').ok).toBe(true) // 首尾空白容忍
+  })
+
+  test('CRLF 折行容忍（Windows 剪贴板高频形态，审查 I-4 回归）', () => {
+    expect(validatePem(PUB_CRLF, 'public').ok).toBe(true)
+    const PRI_CRLF = PRI.split('\n').join('\r\n')
+    expect(validatePem(PRI_CRLF, 'private').ok).toBe(true)
+    expect(validatePem(`-----BEGIN PUBLIC KEY-----\r\nMFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKxP4fHv\r\n-----END PUBLIC KEY-----`, 'public').ok).toBe(true)
+  })
+
+  test('正文问题给出可操作原因，不再自相矛盾（审查 I-4）', () => {
+    const r = validatePem(PUB.replace(/\n/g, '\r\n') + '!!!', 'public')
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('正文不合法')
+  })
+
+  test('空正文骨架拒绝（审查 M-3）', () => {
+    expect(validatePem('-----BEGIN PUBLIC KEY-----\r\n\r\n-----END PUBLIC KEY-----', 'public').ok).toBe(false)
+    expect(validatePem('-----BEGIN PUBLIC KEY-----\n-----END PUBLIC KEY-----', 'public').ok).toBe(false)
   })
 
   test('缺头/缺尾/类型不匹配/私钥当公钥', () => {
@@ -40,7 +59,11 @@ describe('mock RSA（WebCrypto）：往返与签名', () => {
     const kp = await mock.rsaGenerateKeyPair(2048)
     expect(kp.publicKey).toContain('-----BEGIN PUBLIC KEY-----')
     expect(kp.privateKey).toContain('-----BEGIN PRIVATE KEY-----')
-    expect(kp.publicKey.split('\n').every((l) => l.length <= 64 + 30 || l === '')).toBe(true) // PEM 64 字符折行
+    // PEM 正文按 64 字符折行（审查 M-11：收紧断言）
+    const pubLines = kp.publicKey.split('\n')
+    expect(pubLines[0]).toBe('-----BEGIN PUBLIC KEY-----')
+    expect(pubLines[pubLines.length - 1]).toBe('-----END PUBLIC KEY-----')
+    expect(pubLines.slice(1, -1).every((l) => l.length > 0 && l.length <= 64)).toBe(true)
   })
 
   test('OAEP-SHA256 加解密往返', async () => {
@@ -104,5 +127,22 @@ describe('mock 与 node:crypto 交叉互验（PEM 格式 = OpenSSL 生态通用�
     const cipher = await mock.rsaPublicEncrypt(publicKey, Buffer.from('from node').toString('base64'), 'oaep')
     const plain = await mock.rsaPrivateDecrypt(privateKey, cipher, 'oaep')
     expect(Buffer.from(plain, 'base64').toString('utf-8')).toBe('from node')
+  })
+
+  test('未知哈希显式抛错，不再静默回退（审查 M-6）', async () => {
+    const kp = await mock.rsaGenerateKeyPair(2048)
+    await expect(mock.rsaSign(kp.privateKey, 'x', 'sha512')).rejects.toThrow('不支持的哈希算法')
+    await expect(mock.rsaVerify(kp.publicKey, 'x', 'AAAA', 'sha512')).rejects.toThrow('不支持的哈希算法')
+  })
+
+  test('PKCS#1 旧形态 PEM（BEGIN RSA PRIVATE KEY）可被 mock 解析（审查 M-2）', async () => {
+    // 由 PKCS#8 转换不可行（WebCrypto 无此能力），用完整 PKCS#1 形态直接验证解析容错：
+    // 仅验证「不再因标签含 RSA 前缀而报格式错误」——正文不足仍会报错，但错误类型不同
+    const kp = await mock.rsaGenerateKeyPair(2048)
+    const body = kp.privateKey.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, '').replace(/\s+/g, '')
+    const legacy = `-----BEGIN RSA PRIVATE KEY-----\n${body.match(/.{1,64}/g).join('\n')}\n-----END RSA PRIVATE KEY-----`
+    // PKCS#1 与 PKCS#8 的 DER 结构不同，mock 的 WebCrypto importKey 会拒绝 DER 解析（内核行为），
+    // 但绝不能因「PEM 格式不正确」（标签问题）而失败——区分两种错误
+    await expect(mock.rsaPrivateDecrypt(legacy, 'AAAA', 'oaep')).rejects.not.toThrow('PEM 格式不正确')
   })
 })

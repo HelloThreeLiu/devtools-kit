@@ -10,6 +10,7 @@
 const ALGO = { CBC: 'AES-CBC', GCM: 'AES-GCM' }
 const IV_LEN = { CBC: 16, GCM: 12 }
 const KEY_LEN = [16, 24, 32] // 128 / 192 / 256 位
+const PLAIN_MAX = 1024 * 1024 // 明文软上限 1 MB（W4 审查 I-6：超长请分段）
 
 export const MODES = [
   { id: 'CBC', label: 'CBC', hint: '默认 · PKCS#7 填充' },
@@ -20,6 +21,20 @@ export const KEY_BITS = [128, 192, 256]
 
 function bytesToHex(bytes) {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** 字节 → 二进制串（分块拼接：String.fromCharCode spread 超过 ~12 万参数会栈溢出，W4 审查 I-6） */
+function bytesToBin(bytes) {
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return bin
+}
+
+function bytesToB64(bytes) {
+  return btoa(bytesToBin(bytes))
 }
 
 function hexToBytes(hex) {
@@ -49,9 +64,12 @@ function parseBytes(str, format, what) {
   return r.ok ? r : { ok: false, error: `${what}：${r.error}` }
 }
 
-/** 生成随机密钥（crypto.getRandomValues），format: 'hex' | 'base64' | 'raw'（raw 返回 Uint8Array） */
+/** 生成随机密钥（crypto.getRandomValues），bits 仅支持 128 / 192 / 256；format: 'hex' | 'base64' | 'raw'（raw 返回 Uint8Array） */
 export function generateAesKey(bits = 256, format = 'hex') {
-  const len = KEY_LEN.includes(Math.round(bits / 8)) ? Math.round(bits / 8) : 32
+  const len = Math.round(bits / 8)
+  if (!KEY_LEN.includes(len)) {
+    throw new Error('不支持的 AES 密钥长度：' + bits + ' 位（仅 128 / 192 / 256）')
+  }
   const bytes = new Uint8Array(len)
   crypto.getRandomValues(bytes)
   return {
@@ -64,7 +82,7 @@ export function generateAesKey(bits = 256, format = 'hex') {
 
 /** 密钥字节 → 字符串（'hex' | 'base64'） */
 export function aesKeyToString(bytes, format = 'hex') {
-  return format === 'base64' ? btoa(String.fromCharCode(...bytes)) : bytesToHex(bytes)
+  return format === 'base64' ? btoa(bytesToBin(bytes)) : bytesToHex(bytes)
 }
 
 /** 生成随机 IV（CBC 16B / GCM 12B），format: 'hex' | 'base64' */
@@ -72,7 +90,7 @@ export function generateAesIv(mode, format = 'hex') {
   const len = IV_LEN[mode] || 16
   const bytes = new Uint8Array(len)
   crypto.getRandomValues(bytes)
-  return { ok: true, iv: format === 'base64' ? btoa(String.fromCharCode(...bytes)) : bytesToHex(bytes), bytes }
+  return { ok: true, iv: format === 'base64' ? btoa(bytesToBin(bytes)) : bytesToHex(bytes), bytes }
 }
 
 /**
@@ -96,6 +114,10 @@ export async function aesEncrypt(p = {}) {
   if (!KEY_LEN.includes(kr.bytes.length)) {
     return { ok: false, error: `密钥长度不合法：AES 支持 128 / 192 / 256 位，即 ${KEY_LEN.join(' / ')} 字节，当前 ${kr.bytes.length} 字节` }
   }
+  const plainBytes = new TextEncoder().encode(String(p.plaintext ?? ''))
+  if (plainBytes.length > PLAIN_MAX) {
+    return { ok: false, error: `明文超过 1 MB（当前 ${Math.ceil(plainBytes.length / 1024)} KB）：请缩短内容或分段加密` }
+  }
   let ivBytes
   if (p.iv) {
     const ir = parseBytes(p.iv, output, 'IV')
@@ -110,10 +132,8 @@ export async function aesEncrypt(p = {}) {
 
   try {
     const key = await crypto.subtle.importKey('raw', kr.bytes, { name: ALGO[mode] }, false, ['encrypt'])
-    const cipher = new Uint8Array(
-      await crypto.subtle.encrypt({ name: ALGO[mode], iv: ivBytes }, key, new TextEncoder().encode(String(p.plaintext ?? ''))),
-    )
-    const enc = (bytes) => (output === 'hex' ? bytesToHex(bytes) : btoa(String.fromCharCode(...bytes)))
+    const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: ALGO[mode], iv: ivBytes }, key, plainBytes))
+    const enc = (bytes) => (output === 'hex' ? bytesToHex(bytes) : bytesToB64(bytes))
     return { ok: true, iv: enc(ivBytes), data: enc(cipher), mode }
   } catch (e) {
     return { ok: false, error: '加密失败：输入包含无效字符（如孤立的代理字符）' }
@@ -157,6 +177,6 @@ export async function aesDecrypt(p = {}) {
     if (mode === 'GCM') {
       return { ok: false, error: '解密失败：密文或密钥不匹配（GCM 认证校验未通过）' }
     }
-    return { ok: false, error: '解密失败：密钥或 IV 不正确，或密文已损坏' }
+    return { ok: false, error: '解密失败：密钥或 IV 不正确，密文已损坏，或解密结果不是 UTF-8 文本' }
   }
 }
