@@ -315,11 +315,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 长表单页：区块不参与 flex 压缩，超出部分交给 tool-body 自然滚动 */
-.tool-body > .block {
-  flex-shrink: 0;
-}
+/* 区块防压缩由 main.css 的 .tool-body > .block 全局规则承担；guide 条单独补防压缩 */
 .guide {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;

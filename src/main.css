@@ -676,6 +676,13 @@ a { color: inherit; text-decoration: none; }
 .block { display: flex; flex-direction: column; min-height: 0; }
 .block--fill { flex: 1; }
 
+/* 区块不参与 flex 压缩（W4 真机反馈：min-height:0 使窗口不足时区块被压到内容以下，
+   输入框/结果区互相叠压——file-b64 与 AES 解密区均为此类）。内容超出窗口时
+   由 .tool-body 的 overflow-y:auto 自然滚动；.block--fill 仍通过 flex:1 填充剩余空间 */
+.tool-body > .block {
+  flex-shrink: 0;
+}
+
 .block-head {
   flex: none;
   display: flex;
