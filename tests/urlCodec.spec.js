@@ -43,6 +43,14 @@ describe('URL 智能模式（R1.1 产品决策）', () => {
     expect(r.data).toBe('http://localhost:5173/api/%E6%B5%8B%E8%AF%95?q=%E5%80%BC')
   })
 
+  test('智能模式输入首尾空白按粘贴语义处理（审查 M-1）', () => {
+    expect(encodeUrl(' https://a.com/?kw=你好', 'smart').data).toBe(
+      'https://a.com/?kw=%E4%BD%A0%E5%A5%BD',
+    )
+    expect(encodeUrl('https://a.com\n', 'smart').data).toBe('https://a.com')
+    expect(encodeUrl('  hello world  ', 'smart').data).toBe('hello%20world')
+  })
+
   test('默认模式仍为 component（不改变既有调用方行为）', () => {
     expect(encodeUrl('https://a.com/?kw=你好').data).toBe(
       'https%3A%2F%2Fa.com%2F%3Fkw%3D%E4%BD%A0%E5%A5%BD',
@@ -115,6 +123,23 @@ describe('URL 宽容解码（R1.1：非法 % 序列不再整体失败）', () =>
   test('合法输入不带 partial 标注', () => {
     expect(decodeUrl('%E4%BD%A0%E5%A5%BD').partial).toBeUndefined()
     expect(decodeUrl('plain text').partial).toBeUndefined()
+  })
+
+  test('大小写混排 %XX 正常解码（审查 M-7）', () => {
+    expect(decodeUrl('%e4%bd%a0%E5%A5%BD').data).toBe('你好')
+    expect(decodeUrl('%e4%bd%a0%E5%A5%BD').partial).toBeUndefined()
+  })
+
+  test('strict 成功片段与裸 % 混合（审查 M-7）', () => {
+    const r = decodeUrl('你%20好%')
+    expect(r.ok).toBe(true)
+    expect(r.data).toBe('你 好%')
+    expect(r.partial).toBe(true)
+  })
+
+  test('宽容解码中解码器复用安全：非法序列后紧接合法序列（审查 B-1）', () => {
+    // %FF 失败后 %E5%A5%BD 仍须正确解码——若 TextDecoder 复用引入状态污染此处即失败
+    expect(decodeUrl('%E4%BD%A0%FF%E5%A5%BD').data).toBe('你%FF好')
   })
 })
 

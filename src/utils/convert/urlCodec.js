@@ -22,7 +22,10 @@ function resolveMode(s, mode) {
  * @returns {{ ok:boolean, data?:string, resolvedMode?:'uri'|'component', error?:string }}
  */
 export function encodeUrl(str, mode = 'component') {
-  const s = String(str ?? '')
+  const s0 = String(str ?? '')
+  // 智能模式按「粘贴语义」处理：URL 首尾不应有空白，判定与编码前统一 trim，
+  // 避免尾随换行被编码成 %0A、前导空白导致判向错误（审查 M-1）
+  const s = mode === 'smart' ? s0.trim() : s0
   try {
     const resolved = resolveMode(s, mode)
     return {
@@ -39,17 +42,19 @@ export function encodeUrl(str, mode = 'component') {
 const PCT_RUN = /(?:%[0-9A-Fa-f]{2})+/g
 
 /**
+ * UTF-8 严格解码器（decode() 非流式调用每次重置内部状态，异常后可安全复用；
+ * 复用避免对超长恶意输入逐序列构造解码器的开销，审查 B-1）
+ */
+const UTF8_STRICT = new TextDecoder('utf-8', { fatal: true })
+
+/**
  * 单个片段的宽容解码：按 UTF-8 首字节判定序列长度，逐序列解码；
  * 非法首字节 / 不完整序列 / 非法组合均按字面保留，其余正常还原。
+ * 调用方已对整段 decodeURIComponent 失败，此处不再整体重试（审查 M-5）。
  * @param {string} run 形如 %XX%XX… 的片段
  * @returns {{ text: string }} 无法解码的部分以原文形式保留在 text 中
  */
 function decodeRun(run) {
-  try {
-    return { text: decodeURIComponent(run) }
-  } catch (e) {
-    /* 转逐序列宽容解码 */
-  }
   const seqs = run.match(/%[0-9A-Fa-f]{2}/g) || []
   let text = ''
   let i = 0
@@ -61,7 +66,7 @@ function decodeRun(run) {
       const bytes = []
       for (let k = 0; k < need; k++) bytes.push(parseInt(seqs[i + k].slice(1), 16))
       try {
-        text += new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes))
+        text += UTF8_STRICT.decode(Uint8Array.from(bytes))
         i += need
         continue
       } catch (e) {

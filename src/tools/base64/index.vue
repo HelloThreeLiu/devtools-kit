@@ -19,9 +19,10 @@ const urlSafe = ref(false) // R1.2：Base64URL 输出（+/ → -_ 、去 padding
 
 useReplay('base64', (v) => (input.value = String(v ?? '')))
 
-/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理） */
-useHistRecorder('base64', input, (v) => {
-  const r = convertBase64(v, mode.value, { urlSafe: urlSafe.value })
+/* 历史记录：有效结果停顿 1s 后写入（卸载自动清理）
+   监听 [input, urlSafe]：切换 Base64URL 开关也重录当前输出，保持历史与结果区一致（审查 M-3） */
+useHistRecorder('base64', () => [input.value, urlSafe.value], (src) => {
+  const r = convertBase64(src[0], mode.value, { urlSafe: src[1] })
   return r.ok ? r.data : null
 })
 

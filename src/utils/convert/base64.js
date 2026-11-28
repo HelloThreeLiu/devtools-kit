@@ -20,9 +20,17 @@ function stripInvisible(str) {
   return String(str ?? '').replace(INVISIBLE, '')
 }
 
-/** 是否形似 Base64（自动识别用） */
+/**
+ * 判向（auto 模式）专用：仅剥离排版类空白（换行 / Tab / NBSP / 零宽等），保留普通空格（U+0020）。
+ * 含空格的普通英文短语（如 "test test"）剥离后仍是合法 Base64 字符集，
+ * 若全部剥离会被误判为解码方向、输出报错或乱码（审查 I-1 回归）。
+ * 换行 / Tab 属排版折叠特征，剥离后仍可识别邮件折叠排版与 PEM 正文。
+ */
+const LAYOUT_WS = /[\t\n\v\f\r\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff\u200b-\u200d\u2060]/g
+
+/** 是否形似 Base64（自动识别判向用；仅剥离排版类空白，见 LAYOUT_WS 注释） */
 export function looksLikeB64(str) {
-  const t = stripInvisible(str)
+  const t = String(str ?? '').replace(LAYOUT_WS, '')
   if (t.length < 4) return false
   const body = t.replace(/=+$/, '')
   const pad = t.slice(body.length)

@@ -36,6 +36,20 @@ describe('Base64 编码（PRD 4.3.2）', () => {
     expect(r.data).toBe('你好')
   })
 
+  test('auto：含空格的普通短语保持编码方向（审查 I-1 回归用例）', () => {
+    // 判向保留普通空格：这些输入若全量剥离空白会被误判为 Base64（报错或乱码输出）
+    for (const phrase of ['test test', 'hello world', 'user data', 'error 404', 'dd aa']) {
+      const r = convertBase64(phrase, 'auto')
+      expect(r.direction).toBe('encode')
+      expect(decodeB64(r.data).data).toBe(phrase)
+    }
+  })
+
+  test('auto：纯空格输入判为编码并剥离（与解码方向全量剥离一致）', () => {
+    // 多个空格组成的串不构成 Base64 → 编码方向
+    expect(convertBase64('a   b', 'auto').direction).toBe('encode')
+  })
+
   test('Base64URL 输出开关（R1.2：+/ → -_ 、去 padding）', () => {
     expect(encodeB64('hello', { urlSafe: true }).data).toBe('aGVsbG8')
     expect(encodeB64('你好', { urlSafe: true }).data).toBe('5L2g5aW9')

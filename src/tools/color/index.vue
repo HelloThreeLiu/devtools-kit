@@ -46,17 +46,37 @@ const pickSupported = inUtoolsEnv
   : typeof window !== 'undefined' && typeof window.EyeDropper === 'function'
 const picking = ref(false)
 
+// v7.x 宿主取消取色时回调与 Promise 都无信号，超时后恢复按钮可用（审查 I-2）
+const PICK_TIMEOUT = 60000
+
 async function pickFromScreen() {
   if (!pickSupported || picking.value) return
   picking.value = true
   try {
-    const c = await utools.screenColorPick()
+    // 双形态桥接：v7.x 仅支持回调式，v8+ 返回 Promise（取消时 reject）；
+    // 两种形态可能同时触发，用 settled 去重；超时兜底保证 v7 取消后按钮可恢复。
+    const c = await new Promise((resolve) => {
+      let settled = false
+      let timer = null
+      const done = (color) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(color)
+      }
+      timer = setTimeout(() => done(null), PICK_TIMEOUT)
+      try {
+        const p = utools.screenColorPick((color) => done(color))
+        if (p && typeof p.then === 'function') p.then(done, () => done(null))
+      } catch (e) {
+        done(null)
+      }
+    })
     if (c?.hex) {
       input.value = c.hex // #rrggbb，parseColor 可直接解析
       inputEl.value?.focus()
     }
-  } catch {
-    /* 用户取消（Esc）→ 静默 */
+    /* 取消 / 超时 / 无结果 → 静默 */
   } finally {
     picking.value = false
   }
@@ -105,7 +125,7 @@ onMounted(() => {
           type="button"
           class="btn"
           :disabled="!pickSupported || picking"
-          title="屏幕取色：吸取屏幕任意位置的颜色"
+          :title="pickSupported ? '屏幕取色：吸取屏幕任意位置的颜色' : '当前环境不支持屏幕取色'"
           aria-label="屏幕取色"
           @click="pickFromScreen"
         >
