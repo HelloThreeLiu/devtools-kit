@@ -17,6 +17,19 @@ import { useMainResult } from '../../utils/mainResult.js'
 import { useReplay } from '../../utils/replay.js'
 import { consumeEnterPayload } from '../../router.js'
 
+/* ---------- 宿主能力（浏览器调试隐藏入口） ---------- */
+
+/* preload 版本探测：RSA 六个动作是 v1.2 批次新增，旧装载的 preload 不含（W4：给出生效指引而非裸错误） */
+const rsaReady =
+  typeof services.rsaGenerateKeyPair === 'function' &&
+  typeof services.rsaExtractPublic === 'function' &&
+  typeof services.rsaPublicEncrypt === 'function' &&
+  typeof services.rsaPrivateDecrypt === 'function' &&
+  typeof services.rsaSign === 'function' &&
+  typeof services.rsaVerify === 'function'
+const PRELOAD_STALE_MSG =
+  '当前装载的 preload 版本不含 RSA 能力：请在 uTools 开发者模式下重新安装本插件（或重启 uTools）后重试——修改 preload.js 需重新装载才生效'
+
 /* ---------- 密钥对 ---------- */
 
 const keyBits = ref(2048)
@@ -25,6 +38,10 @@ const keyPair = ref(null) // { publicKey, privateKey }
 
 async function generate() {
   if (generating.value) return
+  if (!rsaReady) {
+    toast(PRELOAD_STALE_MSG)
+    return
+  }
   generating.value = true
   try {
     // 先让「生成中…」渲染，再执行耗时生成（4096 秒级）
@@ -67,6 +84,10 @@ watch([pubPem, pubPlain, pubMode], async () => {
     pubRes.value = { ok: false, empty: true }
     return
   }
+  if (!rsaReady) {
+    pubRes.value = { ok: false, error: PRELOAD_STALE_MSG }
+    return
+  }
   if (pubErr.value) {
     pubRes.value = { ok: false, error: pubErr.value }
     return
@@ -83,7 +104,7 @@ watch([pubPem, pubPlain, pubMode], async () => {
 })
 
 async function onVerify() {
-  if (pubErr.value || !pubPlain.value.trim() || !pubSig.value.trim()) return
+  if (!rsaReady || pubErr.value || !pubPlain.value.trim() || !pubSig.value.trim()) return
   try {
     verifyRes.value = (await services.rsaVerify(pubPem.value, pubPlain.value, pubSig.value, pubHash.value)) === true
   } catch (e) {
@@ -115,6 +136,10 @@ watch([priPem, priCipher, priMode], async () => {
     priDecRes.value = { ok: false, empty: true }
     return
   }
+  if (!rsaReady) {
+    priDecRes.value = { ok: false, error: PRELOAD_STALE_MSG }
+    return
+  }
   if (priErr.value) {
     priDecRes.value = { ok: false, error: priErr.value }
     return
@@ -133,6 +158,10 @@ watch([priPem, priCipher, priMode], async () => {
 
 async function onSign() {
   if (signing.value || priErr.value || !priData.value.trim()) return
+  if (!rsaReady) {
+    toast(PRELOAD_STALE_MSG)
+    return
+  }
   signing.value = true
   try {
     priSig.value = await services.rsaSign(priPem.value, priData.value, priHash.value)
@@ -187,6 +216,12 @@ onMounted(() => {
 
 <template>
   <div class="tool-body">
+    <!-- preload 版本过旧提示（v1.2 批次新增能力需要重新装载插件生效） -->
+    <div v-if="!rsaReady" class="alert" role="alert">
+      <Icon name="alert" />
+      <div class="alert-body">{{ PRELOAD_STALE_MSG }}</div>
+    </div>
+
     <!-- 密钥对生成 -->
     <div class="block">
       <div class="block-head">
