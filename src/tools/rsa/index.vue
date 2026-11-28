@@ -517,7 +517,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 区块防压缩由 main.css 的 .tool-body > .block 全局规则承担；guide 条单独补防压缩 */
+/* 步骤区卡片化：边框 + 内边距 + 表面底色，区块间自然分离（真机反馈：页面拥挤、内容贴在一起） */
+.tool-body > .block {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-12) var(--sp-14);
+  background: var(--surface);
+}
 .guide {
   flex-shrink: 0;
   display: flex;

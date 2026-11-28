@@ -225,7 +225,7 @@ onMounted(() => {
         id="aesEncPlain"
         v-model="encPlain"
         class="textarea"
-        style="min-height: 64px"
+        style="min-height: 72px"
         placeholder="输入要加密的明文；输入后自动加密"
         spellcheck="false"
       ></textarea>
@@ -250,7 +250,7 @@ onMounted(() => {
       </div>
       <div class="pane pane--text">
         <div class="pane-scroll">
-          <div v-if="!encPlain.trim() || !key.trim()" class="placeholder">① 的密钥就绪并输入明文后，这里显示密文与 IV。</div>
+          <div v-if="!encPlain.trim() || !key.trim()" class="placeholder">密钥就绪并输入明文后，这里显示密文与 IV。</div>
           <span v-else-if="encRes.error">—</span>
           <template v-else>{{ encRes.data }}</template>
         </div>
@@ -292,7 +292,7 @@ onMounted(() => {
         id="aesDecCipher"
         v-model="decCipher"
         class="textarea"
-        style="min-height: 64px"
+        style="min-height: 72px"
         placeholder="粘贴收到的密文；输入后自动解密"
         spellcheck="false"
       ></textarea>
@@ -302,7 +302,7 @@ onMounted(() => {
       </div>
       <div class="pane pane--text">
         <div class="pane-scroll">
-          <div v-if="!decCipher.trim() || !key.trim() || !decIv.trim()" class="placeholder">① 的密钥就绪并粘贴密文与 IV 后，这里显示还原的明文。</div>
+          <div v-if="!decCipher.trim() || !key.trim() || !decIv.trim()" class="placeholder">密钥就绪并粘贴密文与 IV 后，这里显示还原的明文。</div>
           <span v-else-if="decRes.error">—</span>
           <template v-else>{{ decRes.data }}</template>
         </div>
@@ -315,7 +315,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 区块防压缩由 main.css 的 .tool-body > .block 全局规则承担；guide 条单独补防压缩 */
+/* 步骤区卡片化：边框 + 内边距 + 表面底色，区块间自然分离（真机反馈：页面拥挤、内容贴在一起） */
+.tool-body > .block {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-12) var(--sp-14);
+  background: var(--surface);
+}
 .guide {
   flex-shrink: 0;
   display: flex;
@@ -370,7 +377,7 @@ onMounted(() => {
   color: var(--muted);
 }
 .iv-head {
-  margin-top: 6px;
+  margin-top: 10px;
 }
 .mono {
   font-family: var(--mono);
