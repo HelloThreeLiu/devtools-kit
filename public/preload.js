@@ -118,7 +118,7 @@ function writeHistory(data) {
 
 window.services = {
   /** 构建标记：preload 只在插件装载时执行一次，用于诊断「渲染进程新、preload 旧」的版本偏差 */
-  __buildTag: 'v1.2-pre-20261128-rsa',
+  __buildTag: 'v1.1.0-20261128',
   /**
    * 哈希计算（PRD 4.3.6）
    * @param {string} text

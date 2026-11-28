@@ -383,6 +383,10 @@ onMounted(() => {
         placeholder="输入要加密的明文；输入后自动加密"
         spellcheck="false"
       ></textarea>
+      <div class="alert" :hidden="!pubRes.error" role="alert">
+        <Icon name="alert" />
+        <span>{{ pubRes.error }}</span>
+      </div>
       <div class="block-head" style="margin-top: 6px">
         <span>密文（Base64）</span>
         <span class="grow"></span>
@@ -429,6 +433,10 @@ onMounted(() => {
         autocomplete="off"
         spellcheck="false"
       />
+      <div class="alert" :hidden="!priDecRes.error" role="alert">
+        <Icon name="alert" />
+        <span>{{ priDecRes.error }}</span>
+      </div>
       <div class="pane pane--text" style="margin-top: 6px">
         <div class="pane-scroll">
           <div v-if="!priCipher.trim() || !priPem.trim()" class="placeholder">私钥就绪并粘贴密文后，这里显示还原的明文。</div>
@@ -491,7 +499,7 @@ onMounted(() => {
         </div>
         <button type="button" class="btn btn--ghost" :disabled="!rsaReady || pubErr || !pubPlain.trim() || !pubSig.trim() || pubSigLooksLikePem" @click="onVerify">验证签名</button>
         <span v-if="verifyRes === true" class="tag tag--ok">验签通过</span>
-        <span v-else-if="verifyRes === false && pubSigLooksLikePem" class="tag tag--err">粘贴的是 PEM 公钥，不是签名——请先在「④ 签名」用「生成签名」产出 Base64 签名</span>
+        <span v-if="pubSigLooksLikePem" class="tag tag--err" title="签名是「④ 签名 · 生成签名」产出的 Base64 串，不是 PEM 公钥">输入框里是 PEM 公钥——签名请用「④ 签名 · 生成签名」产出后粘贴</span>
         <span v-else-if="verifyRes === false" class="tag tag--err">验签失败（内容或签名被篡改，或密钥/哈希不匹配）</span>
       </div>
       <div class="block-head">
