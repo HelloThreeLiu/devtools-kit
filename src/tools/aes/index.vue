@@ -379,6 +379,10 @@ onMounted(() => {
 .iv-head {
   margin-top: 10px;
 }
+/* 结果面板与上方输入框的最小间距（直连时会贴在一起，W4 真机反馈） */
+.pane {
+  margin-top: 8px;
+}
 .mono {
   font-family: var(--mono);
 }

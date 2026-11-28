@@ -563,6 +563,10 @@ onMounted(() => {
   font-size: var(--fs-12);
   font-weight: 600;
 }
+/* 结果面板与上方输入框的最小间距（直连时会贴在一起，W4 真机反馈） */
+.pane {
+  margin-top: 8px;
+}
 .step-texts {
   display: flex;
   align-items: baseline;
