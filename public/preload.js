@@ -3,11 +3,98 @@
  * 规范（docs/技术设计.md §7）：CommonJS；window.services 统一命名空间；
  * 最小暴露原则——仅暴露「业务动作」，禁止透传 fs/path/child_process 等原始对象。
  */
-const { createHash } = require('node:crypto')
+const {
+  createHash,
+  randomBytes,
+  generateKeyPairSync,
+  createPublicKey,
+  publicEncrypt,
+  privateDecrypt,
+  createSign,
+  createVerify,
+  constants,
+} = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 
 const ALGOS = ['md5', 'sha1', 'sha256', 'sha512']
+
+/* ---------- RSA（R2.8，最小暴露：仅业务动作，密钥/数据均以 PEM / Base64 字符串进出） ---------- */
+
+const RSA_PADDINGS = {
+  oaep: constants.RSA_PKCS1_OAEP_PADDING,
+  pkcs1: constants.RSA_PKCS1_PADDING,
+}
+const RSA_HASHES = ['sha1', 'sha256']
+
+function rsaWrap(fn) {
+  try {
+    return fn()
+  } catch (e) {
+    throw new Error('RSA 操作失败：密钥格式不正确，或密文 / 填充方式与密钥不匹配')
+  }
+}
+
+/**
+ * 生成 RSA 密钥对（2048/4096；4096 耗时秒级，UI 需先显示 loading 再调用）
+ * @returns {{ publicKey: string, privateKey: string }} SPKI PEM / PKCS#8 PEM
+ */
+function rsaGenerateKeyPair(bits) {
+  const modulusLength = Number(bits) === 4096 ? 4096 : 2048
+  return rsaWrap(() => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+    return { publicKey, privateKey }
+  })
+}
+
+/** 基于私钥导出公钥（等价 openssl rsa -pubout） */
+function rsaExtractPublic(privatePem) {
+  return rsaWrap(() => createPublicKey(String(privatePem)).export({ type: 'spki', format: 'pem' }).toString())
+}
+
+/** 公钥加密（OAEP-SHA256 默认 / PKCS#1 v1.5 可选）→ Base64 */
+function rsaPublicEncrypt(publicPem, dataB64, padding) {
+  return rsaWrap(() =>
+    publicEncrypt(
+      {
+        key: String(publicPem),
+        padding: RSA_PADDINGS[padding] || constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256',
+      },
+      Buffer.from(String(dataB64 || ''), 'base64'),
+    ),
+  ).toString('base64')
+}
+
+/** 私钥解密（对应加密填充）→ Base64（UTF-8 解码由 UI 负责） */
+function rsaPrivateDecrypt(privatePem, cipherB64, padding) {
+  return rsaWrap(() =>
+    privateDecrypt(
+      {
+        key: String(privatePem),
+        padding: RSA_PADDINGS[padding] || constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256',
+      },
+      Buffer.from(String(cipherB64 || ''), 'base64'),
+    ),
+  ).toString('base64')
+}
+
+/** 私钥签名（SHA-256 / SHA-1，PKCS#1 v1.5）→ Base64；data 为 UTF-8 文本 */
+function rsaSign(privatePem, data, hash) {
+  const h = RSA_HASHES.includes(hash) ? hash : 'sha256'
+  return rsaWrap(() => createSign(h).update(String(data ?? ''), 'utf-8').sign(String(privatePem))).toString('base64')
+}
+
+/** 公钥验签 → boolean */
+function rsaVerify(publicPem, data, sigB64, hash) {
+  const h = RSA_HASHES.includes(hash) ? hash : 'sha256'
+  return rsaWrap(() => createVerify(h).update(String(data ?? ''), 'utf-8').verify(String(publicPem), String(sigB64 || ''), 'base64'))
+}
 
 /* ---------- 历史记录文件（插件本地数据目录，不入同步库，官方《数据存储》规范） ---------- */
 
@@ -41,6 +128,51 @@ window.services = {
   hash(text, algo) {
     if (!ALGOS.includes(algo)) throw new Error('不支持的算法: ' + algo)
     return createHash(algo).update(String(text ?? ''), 'utf-8').digest('hex')
+  },
+
+  /** 基于私钥导出公钥（等价 openssl rsa -pubout） */
+  rsaExtractPublic(privatePem) {
+    return rsaWrap(() => createPublicKey(String(privatePem)).export({ type: 'spki', format: 'pem' }).toString())
+  },
+
+  /** 公钥加密（OAEP-SHA256 默认 / PKCS#1 v1.5 可选）→ Base64 */
+  rsaPublicEncrypt(publicPem, dataB64, padding) {
+    return rsaWrap(() =>
+      publicEncrypt(
+        {
+          key: String(publicPem),
+          padding: RSA_PADDINGS[padding] || constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(String(dataB64 || ''), 'base64'),
+      ),
+    ).toString('base64')
+  },
+
+  /** 私钥解密（对应加密填充）→ Base64（UTF-8 解码由 UI 负责） */
+  rsaPrivateDecrypt(privatePem, cipherB64, padding) {
+    return rsaWrap(() =>
+      privateDecrypt(
+        {
+          key: String(privatePem),
+          padding: RSA_PADDINGS[padding] || constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(String(cipherB64 || ''), 'base64'),
+      ),
+    ).toString('base64')
+  },
+
+  /** 私钥签名（SHA-256 / SHA-1，PKCS#1 v1.5）→ Base64；data 为 UTF-8 文本 */
+  rsaSign(privatePem, data, hash) {
+    const h = RSA_HASHES.includes(hash) ? hash : 'sha256'
+    return rsaWrap(() => createSign(h).update(String(data ?? ''), 'utf-8').sign(String(privatePem))).toString('base64')
+  },
+
+  /** 公钥验签 → boolean */
+  rsaVerify(publicPem, data, sigB64, hash) {
+    const h = RSA_HASHES.includes(hash) ? hash : 'sha256'
+    return rsaWrap(() => createVerify(h).update(String(data ?? ''), 'utf-8').verify(String(publicPem), String(sigB64 || ''), 'base64'))
   },
 
   /** 读取全部历史：{ version, history: { toolId: [{ input, output, ts }] } } */

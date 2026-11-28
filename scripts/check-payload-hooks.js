@@ -2,7 +2,7 @@
 const fs = require('fs')
 const files = [
   'timestamp', 'base64', 'base32', 'file-b64', 'url-codec', 'json', 'radix', 'date-calc',
-  'hash', 'color', 'unicode', 'encoding', 'case-convert', 'text-stat', 'qrcode',
+  'hash', 'aes', 'rsa', 'color', 'unicode', 'encoding', 'case-convert', 'text-stat', 'qrcode',
 ]
 let bad = []
 for (const f of files) {

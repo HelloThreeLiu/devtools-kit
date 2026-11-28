@@ -38,6 +38,19 @@
   - 复制图片（`utools.copyImage`，官方支持 Data URL 直入）与另存为
     （`utools.showSaveDialog` + preload 保存动作）；
   - webp / svg 按 Data URL 正确 MIME 渲染，无需转码；大输入粘贴 200ms 防抖。
+- 新工具「AES 加解密」（R2.5，自 v1.2 提前交付）：
+  - CBC（默认，PKCS#7，与 OpenSSL 互验）/ GCM（推荐，认证标签随密文返回）；
+  - 密钥 128 / 192 / 256 位一键随机生成（crypto.getRandomValues），Hex / Base64 格式可切换；
+  - IV 自动生成并分栏展示（CBC 16 字节 / GCM 12 字节），解密方向粘贴 IV；
+  - GCM 篡改密文或错误密钥提示「密文或密钥不匹配」，错误密钥不崩溃；
+  - 纯 WebCrypto 实现，密钥不存储、不出本机。
+- 新工具「RSA 加解密」（R2.8，自 v1.3 提前交付）：
+  - 密钥对生成（RSA-2048 / 4096，公钥 SPKI、私钥 PKCS#8 PEM，展示与复制）；
+  - 私钥提取公钥；公钥加密（OAEP-SHA256 默认 / PKCS#1 v1.5 可选）；
+  - 私钥解密；私钥签名 / 公钥验签（SHA-256 / SHA-1，PKCS#1 v1.5）；
+  - 粘贴 PEM 即时校验并给出具体原因（缺尾 / 类型不匹配 / 私钥当公钥等）；
+  - uTools 内由 node:crypto 运算，浏览器调试由 WebCrypto 等价实现，
+    PEM 与 OpenSSL 生态通用（单测交叉互验）；密钥仅本机内存，不落盘、不上传。
 
 ### 增强
 

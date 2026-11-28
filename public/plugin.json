@@ -106,6 +106,16 @@
       "cmds": ["哈希", "hash", "md5", "sha"]
     },
     {
+      "code": "aes",
+      "description": "AES-CBC / GCM 对称加解密，密钥一键生成",
+      "cmds": ["AES加密", "AES解密", "AES", "aes"]
+    },
+    {
+      "code": "rsa",
+      "description": "RSA 密钥对、加解密与签名验签",
+      "cmds": ["RSA加密", "RSA解密", "RSA", "rsa"]
+    },
+    {
       "code": "unicode",
       "description": "Unicode 转义序列与中文互转",
       "cmds": ["unicode", "unicode转中文"]

@@ -13,6 +13,8 @@ import RadixTool from './radix/index.vue'
 import UuidTool from './uuid/index.vue'
 import DateCalcTool from './date-calc/index.vue'
 import HashTool from './hash/index.vue'
+import AesTool from './aes/index.vue'
+import RsaTool from './rsa/index.vue'
 import UnicodeTool from './unicode/index.vue'
 import EncodingTool from './encoding/index.vue'
 import CaseConvertTool from './case-convert/index.vue'
@@ -140,6 +142,30 @@ export const tools = [
     cmds: ['哈希', 'hash', 'md5', 'sha'],
     keywords: 'md5 sha 摘要 digest',
     component: HashTool,
+  },
+  {
+    id: 'aes',
+    code: 'aes',
+    name: 'AES 加解密',
+    description: 'AES-CBC / GCM 对称加解密，密钥一键生成',
+    icon: 'lock',
+    category: 'codec',
+    priority: 'P1',
+    cmds: ['AES加密', 'AES解密', 'AES', 'aes'],
+    keywords: '对称加密 cbc gcm 加密 解密 密钥',
+    component: AesTool,
+  },
+  {
+    id: 'rsa',
+    code: 'rsa',
+    name: 'RSA 加解密',
+    description: 'RSA 密钥对、加解密与签名验签',
+    icon: 'key',
+    category: 'codec',
+    priority: 'P1',
+    cmds: ['RSA加密', 'RSA解密', 'RSA', 'rsa'],
+    keywords: '非对称加密 公钥 私钥 签名 验签 pem',
+    component: RsaTool,
   },
   {
     id: 'unicode',
