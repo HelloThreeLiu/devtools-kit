@@ -44,12 +44,16 @@ const priErr = computed(() => {
   return r.ok ? '' : r.error
 })
 const pubStatusText = computed(() => {
-  if (!pubPem.value.trim()) return '未就绪 · 粘贴或生成'
-  return pubErr.value ? '格式有误' : '就绪 ✓'
+  if (!pubPem.value.trim()) return { text: '未就绪', cls: '', detail: '粘贴 PEM 或点击「生成密钥对」' }
+  return pubErr.value
+    ? { text: '格式有误', cls: 'tag--err', detail: pubErr.value }
+    : { text: '就绪 ✓', cls: 'tag--ok', detail: '可用于下方「② 加密」与「⑤ 验签」' }
 })
 const priStatusText = computed(() => {
-  if (!priPem.value.trim()) return '未就绪 · 粘贴或生成'
-  return priErr.value ? '格式有误' : '就绪 ✓'
+  if (!priPem.value.trim()) return { text: '未就绪', cls: '', detail: '粘贴 PEM 或点击「生成密钥对」' }
+  return priErr.value
+    ? { text: '格式有误', cls: 'tag--err', detail: priErr.value }
+    : { text: '就绪 ✓', cls: 'tag--ok', detail: '可用于下方「③ 解密」与「④ 签名」' }
 })
 
 let generatingSeq = 0
@@ -308,10 +312,8 @@ onMounted(() => {
       <div class="key-cols">
         <div class="key-col">
           <div class="block-head">
-            <label for="rsaPubPem">公钥（SPKI PEM · 用于加密与验签）</label>
-            <span class="tag" :class="pubStatusText.includes('✓') ? 'tag--ok' : pubStatusText.includes('有误') ? 'tag--err' : ''">
-              {{ pubStatusText }}
-            </span>
+            <label for="rsaPubPem" title="SPKI PEM · 用于加密与验签">公钥（SPKI PEM）</label>
+            <span class="tag" :class="pubStatusText.cls" :title="pubStatusText.detail">{{ pubStatusText.text }}</span>
             <span class="grow"></span>
             <button type="button" class="icon-btn" aria-label="复制公钥" title="复制公钥" :disabled="!pubPem" @click="copyText(pubPem, '公钥')">
               <Icon name="copy" size="sm" />
@@ -332,10 +334,8 @@ onMounted(() => {
         </div>
         <div class="key-col">
           <div class="block-head">
-            <label for="rsaPriPem">私钥（PKCS#8 PEM · 用于解密与签名，妥善保管）</label>
-            <span class="tag" :class="priStatusText.includes('✓') ? 'tag--ok' : priStatusText.includes('有误') ? 'tag--err' : ''">
-              {{ priStatusText }}
-            </span>
+            <label for="rsaPriPem" title="PKCS#8 PEM · 用于解密与签名，务必妥善保管、不要泄露">私钥（PKCS#8 PEM）</label>
+            <span class="tag" :class="priStatusText.cls" :title="priStatusText.detail">{{ priStatusText.text }}</span>
             <span class="grow"></span>
             <button type="button" class="icon-btn" aria-label="复制私钥" title="复制私钥" :disabled="!priPem" @click="copyText(priPem, '私钥')">
               <Icon name="copy" size="sm" />
@@ -592,6 +592,18 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+/* 列头防溢出：label 超长省略、tag 不收缩（真机反馈：半宽列说明文字溢出互压） */
+.key-col .block-head {
+  min-width: 0;
+}
+.key-col .block-head label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.key-col .block-head .tag {
+  flex: none;
 }
 .pem-textarea {
   font-family: var(--mono);
