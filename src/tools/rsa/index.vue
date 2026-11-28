@@ -467,7 +467,7 @@ onMounted(() => {
         placeholder="输入要签名的原文"
         spellcheck="false"
       ></textarea>
-      <div class="block-head" v-if="priSig">
+      <div class="block-head sig-output-head" v-if="priSig">
         <span class="tag">签名已生成（Base64 · {{ priSigHash.toUpperCase() }}）</span>
         <span class="grow"></span>
         <button type="button" class="btn btn--ghost" @click="copyText(priSig, '签名')">
@@ -587,5 +587,11 @@ onMounted(() => {
 .pem-textarea {
   font-family: var(--mono);
   font-size: var(--fs-12);
+}
+/* 签名输出行：.block-head 定高 22px 装不下 30px 按钮，放开高度并留出与上方输入框的间距（W4 真机反馈） */
+.sig-output-head {
+  height: auto;
+  min-height: 30px;
+  margin-top: 10px;
 }
 </style>
